@@ -1,5 +1,5 @@
 import { supabase } from "./client";
-import type { UserProfile, UserRole } from "@/types/auth";
+import type { UserProfile } from "@/types/auth";
 
 /**
  * Sign in with email and password via Supabase Auth.
@@ -38,51 +38,56 @@ export function onAuthStateChange(
 }
 
 /**
- * Derive role from a demo email address.
- * Only used as a fallback until the profiles table is configured.
- */
-function deriveRoleFromEmail(email: string): UserRole {
-  if (email.includes("demo.owner")) return "owner";
-  if (email.includes("demo.admin")) return "admin";
-  if (email.includes("demo.engineer")) return "engineer";
-  // Default to engineer for unknown users
-  return "engineer";
-}
-
-/**
- * Fetch the METRA user profile for the given user ID.
- *
- * Currently derives the profile from the authenticated user's email
- * since the Supabase profiles table is not yet configured.
- * This will be replaced with an actual database query once the
- * profiles table and RLS policies are set up.
+ * Fetch the METRA user profile for the given Supabase Auth user ID.
+ * Queries the `profiles` table — role is authoritative from the database only.
  */
 export async function fetchUserProfile(
   userId: string,
-  email: string
+  _email: string
 ): Promise<{ profile: UserProfile | null; error: string | null }> {
-  // TODO: Replace with actual Supabase query once profiles table exists:
-  // const { data, error } = await supabase
-  //   .from("profiles")
-  //   .select("*")
-  //   .eq("id", userId)
-  //   .single();
-
   try {
-    const role = deriveRoleFromEmail(email);
-    const namePart = role.charAt(0).toUpperCase() + role.slice(1);
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id, laboratory_id, full_name, email, role, is_active")
+      .eq("id", userId)
+      .single();
+
+    if (error) {
+      console.error("[METRA] Profile fetch error:", error.code);
+      return { profile: null, error: "Failed to load your profile." };
+    }
+
+    if (!data) {
+      return { profile: null, error: "Profile not found." };
+    }
 
     const profile: UserProfile = {
-      id: userId,
-      laboratory_id: "demo-lab-001",
-      full_name: `Demo ${namePart}`,
-      email,
-      role,
-      is_active: true,
+      id: data.id,
+      laboratory_id: data.laboratory_id,
+      full_name: data.full_name,
+      email: data.email,
+      role: data.role,
+      is_active: data.is_active,
     };
 
     return { profile, error: null };
   } catch {
-    return { profile: null, error: "Failed to fetch user profile." };
+    return { profile: null, error: "Failed to load your profile." };
   }
 }
+
+/**
+ * Create a new Supabase Auth account.
+ * Used during laboratory registration.
+ */
+export async function signUpWithEmail(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+    options: {
+      emailRedirectTo: undefined,
+    },
+  });
+  return { data, error };
+}
+

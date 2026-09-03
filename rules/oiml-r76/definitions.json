@@ -1,0 +1,455 @@
+{
+  "definitions": [
+    {
+      "id": "DEF-T.1.1",
+      "term": "Weighing instrument",
+      "definition": "Measuring instrument that serves to determine the mass of a body by using the action of gravity on this body. The instrument may also be used to determine other quantities, magnitudes, parameters or characteristics related to the determined mass.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.1",
+        "page": 5
+      }
+    },
+    {
+      "id": "DEF-T.1.2",
+      "term": "Non-automatic weighing instrument",
+      "definition": "Instrument that requires the intervention of an operator during the weighing process to decide that the weighing result is acceptable.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2",
+        "page": 5
+      }
+    },
+    {
+      "id": "DEF-T.1.2.1",
+      "term": "Graduated instrument",
+      "definition": "Instrument allowing the direct reading of the complete or partial weighing result.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.1",
+        "page": 5
+      }
+    },
+    {
+      "id": "DEF-T.1.2.2",
+      "term": "Non-graduated instrument",
+      "definition": "Instrument not fitted with a scale numbered in units of mass.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.2",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.2.3",
+      "term": "Self-indicating instrument",
+      "definition": "Instrument in which the position of equilibrium is obtained without the intervention of an operator.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.3",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.2.4",
+      "term": "Semi-self-indicating instrument",
+      "definition": "Instrument with a self-indicating weighing range, in which the operator intervenes to alter the limits of this range.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.4",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.2.5",
+      "term": "Non-self-indicating instrument",
+      "definition": "Instrument in which the position of equilibrium is obtained entirely by the operator.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.5",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.2.6",
+      "term": "Electronic instrument",
+      "definition": "Instrument equipped with electronic devices.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.6",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.2.8",
+      "term": "Price-computing instrument",
+      "definition": "Instrument that calculates the price to pay on the basis of the indicated weight value and the unit price.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.8",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.2.11",
+      "term": "Mobile instrument",
+      "definition": "Non-automatic weighing instrument mounted on or incorporated into a vehicle.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.11",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.2.12",
+      "term": "Portable instrument for weighing road vehicles",
+      "definition": "Non-automatic weighing instrument having a load receptor, in one or several parts, which determines the total mass of road vehicles, and which is designed to be moved to other locations.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.2.12",
+        "page": 6
+      }
+    },
+    {
+      "id": "DEF-T.1.3.1",
+      "term": "Primary indications",
+      "definition": "Indications, signals and symbols that are subject to requirements of this Recommendation.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.1.3.1",
+        "page": 7
+      }
+    },
+    {
+      "id": "DEF-T.2.2",
+      "term": "Module",
+      "definition": "Identifiable part of an instrument that performs a specific function or functions, and that can be separately evaluated.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.2",
+        "page": 7
+      }
+    },
+    {
+      "id": "DEF-T.2.2.1",
+      "term": "Load cell",
+      "definition": "Force transducer which measures mass by converting the measured quantity (mass) into another measured quantity (output).",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.2.1",
+        "page": 8
+      }
+    },
+    {
+      "id": "DEF-T.2.2.2",
+      "term": "Indicator",
+      "definition": "Electronic device of an instrument that may perform the analog-to-digital conversion of the output signal of the load cell.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.2.2",
+        "page": 8
+      }
+    },
+    {
+      "id": "DEF-T.2.2.4",
+      "term": "Digital data processing device",
+      "definition": "Electronic device of an instrument that further processes the data, and supplies the weighing result in a digital format.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.2.4",
+        "page": 9
+      }
+    },
+    {
+      "id": "DEF-T.2.2.7",
+      "term": "Weighing module",
+      "definition": "Part of the weighing instrument that comprises all mechanical and electronic devices but not having the means to display the weighing result.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.2.7",
+        "page": 9
+      }
+    },
+    {
+      "id": "DEF-T.2.7.2",
+      "term": "Zero-setting device",
+      "definition": "Device for setting the indication to zero when there is no load on the load receptor.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.7.2",
+        "page": 11
+      }
+    },
+    {
+      "id": "DEF-T.2.7.2.4",
+      "term": "Initial zero-setting device",
+      "definition": "Device for setting the indication to zero automatically at the time the instrument is switched on and before it is ready for use.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.7.2.4",
+        "page": 11
+      }
+    },
+    {
+      "id": "DEF-T.2.7.3",
+      "term": "Zero-tracking device",
+      "definition": "Device for maintaining the zero indication within certain limits automatically.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.7.3",
+        "page": 11
+      }
+    },
+    {
+      "id": "DEF-T.2.7.4",
+      "term": "Tare device",
+      "definition": "Device for setting the indication to zero when a load is on the load receptor.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.7.4",
+        "page": 11
+      }
+    },
+    {
+      "id": "DEF-T.2.7.5",
+      "term": "Preset tare device",
+      "definition": "Device for subtracting a preset tare value from a gross or net weight value and indicating the result of the calculation.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.7.5",
+        "page": 12
+      }
+    },
+    {
+      "id": "DEF-T.2.8.1",
+      "term": "Legally relevant software",
+      "definition": "Programs, data, type-specific and device-specific parameters that belong to the measuring instrument or module, and define or fulfill functions which are subject to legal control.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.2.8.1",
+        "page": 12
+      }
+    },
+    {
+      "id": "DEF-T.3.1.1",
+      "term": "Maximum capacity (Max)",
+      "definition": "Maximum weighing capacity, not taking into account the additive tare capacity.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.1.1",
+        "page": 13
+      }
+    },
+    {
+      "id": "DEF-T.3.1.2",
+      "term": "Minimum capacity (Min)",
+      "definition": "Value of the load below which the weighing results may be subject to an excessive relative error.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.1.2",
+        "page": 13
+      }
+    },
+    {
+      "id": "DEF-T.3.2.2",
+      "term": "Actual scale interval, d",
+      "definition": "Value, expressed in units of mass of: the difference between the values corresponding to two consecutive scale marks.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.2.2",
+        "page": 14
+      }
+    },
+    {
+      "id": "DEF-T.3.2.3",
+      "term": "Verification scale interval, e",
+      "definition": "Value, expressed in units of mass, used for the classification and verification of an instrument.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.2.3",
+        "page": 14
+      }
+    },
+    {
+      "id": "DEF-T.3.2.5",
+      "term": "Number of verification scale intervals, n",
+      "definition": "Quotient of the maximum capacity and the verification scale interval: n = Max / e",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.2.5",
+        "page": 14
+      }
+    },
+    {
+      "id": "DEF-T.3.2.6",
+      "term": "Multi-interval instrument",
+      "definition": "Instrument having one weighing range which is divided into partial weighing ranges each with different scale intervals.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.2.6",
+        "page": 14
+      }
+    },
+    {
+      "id": "DEF-T.3.2.7",
+      "term": "Multiple range instrument",
+      "definition": "Instrument having two or more weighing ranges with different maximum capacities and different scale intervals for the same load receptor.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.2.7",
+        "page": 14
+      }
+    },
+    {
+      "id": "DEF-T.4.1",
+      "term": "Sensitivity",
+      "definition": "For a given value of the measured mass, the quotient of the change of the observed variable and the corresponding change of the measured mass.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.4.1",
+        "page": 15
+      }
+    },
+    {
+      "id": "DEF-T.4.2",
+      "term": "Discrimination",
+      "definition": "Ability of an instrument to react to small variations of load. The discrimination threshold is the value of the smallest additional load that causes a perceptible change.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.4.2",
+        "page": 15
+      }
+    },
+    {
+      "id": "DEF-T.4.3",
+      "term": "Repeatability",
+      "definition": "Ability of an instrument to provide results that agree one with the other when the same load is deposited several times.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.4.3",
+        "page": 15
+      }
+    },
+    {
+      "id": "DEF-T.4.4",
+      "term": "Durability",
+      "definition": "Ability of an instrument to maintain its performance characteristics over a period of use.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.4.4",
+        "page": 15
+      }
+    },
+    {
+      "id": "DEF-T.4.5",
+      "term": "Warm-up time",
+      "definition": "Time between the moment power is applied to an instrument and the moment at which the instrument is capable of complying with requirements.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.4.5",
+        "page": 15
+      }
+    },
+    {
+      "id": "DEF-T.5.5.1",
+      "term": "Error (of indication)",
+      "definition": "Indication of an instrument minus the (conventional) true value of the corresponding mass.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.5.5.1",
+        "page": 19
+      }
+    },
+    {
+      "id": "DEF-T.5.5.2",
+      "term": "Intrinsic error",
+      "definition": "Error of an instrument determined under reference conditions.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.5.5.2",
+        "page": 19
+      }
+    },
+    {
+      "id": "DEF-T.5.5.4",
+      "term": "Maximum permissible error, mpe",
+      "definition": "Maximum difference allowed by regulation between the indication of an instrument and the corresponding true value.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.5.5.4",
+        "page": 19
+      }
+    },
+    {
+      "id": "DEF-T.5.5.6",
+      "term": "Significant fault",
+      "definition": "Fault greater than e.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.5.5.6",
+        "page": 19
+      }
+    },
+    {
+      "id": "DEF-T.5.5.9",
+      "term": "Span stability",
+      "definition": "Capability of an instrument to maintain the difference between the indication at maximum capacity and the indication at zero over a period of use.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.5.5.9",
+        "page": 20
+      }
+    },
+    {
+      "id": "DEF-T.6.1.1",
+      "term": "Influence factor",
+      "definition": "Influence quantity having a value within the specified rated operating conditions of the instrument.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.6.1.1",
+        "page": 20
+      }
+    }
+  ]
+}

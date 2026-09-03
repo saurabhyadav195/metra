@@ -1,0 +1,268 @@
+{
+  "mpe_rules": [
+    {
+      "rule_id": "MPE_INIT",
+      "name": "Maximum Permissible Errors on Initial Verification (Table 6)",
+      "condition": "Initial verification or type evaluation under reference conditions",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.5.1",
+        "page": 30,
+        "table": "Table 6"
+      },
+      "classes": {,
+        "I": [
+          {
+            "min_load_e": 0,
+            "max_load_e": 50000,
+            "mpe_e": 0.5
+          },
+          {
+            "min_load_e": 50000,
+            "max_load_e": 200000,
+            "mpe_e": 1.0
+          },
+          {
+            "min_load_e": 200000,
+            "max_load_e": "infinity",
+            "mpe_e": 1.5
+          }
+        ],
+        "II": [
+          {
+            "min_load_e": 0,
+            "max_load_e": 5000,
+            "mpe_e": 0.5
+          },
+          {
+            "min_load_e": 5000,
+            "max_load_e": 20000,
+            "mpe_e": 1.0
+          },
+          {
+            "min_load_e": 20000,
+            "max_load_e": 100000,
+            "mpe_e": 1.5
+          }
+        ],
+        "III": [
+          {
+            "min_load_e": 0,
+            "max_load_e": 500,
+            "mpe_e": 0.5
+          },
+          {
+            "min_load_e": 500,
+            "max_load_e": 2000,
+            "mpe_e": 1.0
+          },
+          {
+            "min_load_e": 2000,
+            "max_load_e": 10000,
+            "mpe_e": 1.5
+          }
+        ],
+        "IIII": [
+          {
+            "min_load_e": 0,
+            "max_load_e": 50,
+            "mpe_e": 0.5
+          },
+          {
+            "min_load_e": 50,
+            "max_load_e": 200,
+            "mpe_e": 1.0
+          },
+          {
+            "min_load_e": 200,
+            "max_load_e": 1000,
+            "mpe_e": 1.5
+          }
+        ]
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "MPE_SERVICE",
+      "name": "Maximum Permissible Errors in Service",
+      "condition": "In-service inspection / subsequent verification (service)",
+      "rule": "MPE in service = 2 * MPE_initial",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.5.2",
+        "page": 30
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "MPE_NET_TARE",
+      "name": "MPE for net values and tare weighing devices",
+      "condition": "Tare device in operation",
+      "rule": "Maximum permissible errors apply to the net value for every possible tare load, except preset tare values. MPE for tare weighing device is identical to instrument MPE for same load value.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.5.3.3 & 3.5.3.4",
+        "page": 30
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "REPEATABILITY_LIMIT",
+      "name": "Permissible difference for repeatability",
+      "rule": "Difference between results of several weighings of the same load <= |mpe| of the instrument for that load.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.6.1",
+        "page": 31
+      },
+      "verification_status": "VERIFIED"
+    }
+    {
+      "rule_id": "ECCENTRICITY_LIMIT",
+      "name": "Permissible error for eccentric loading",
+      "rule": "The error of indication at each eccentric position shall not exceed the maximum permissible error for the applied test load.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.6.2",
+        "page": 31
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "ZERO_SETTING_ACCURACY",
+      "name": "Accuracy of zero setting",
+      "rule": "After zero setting, the effect of zero deviation on the result of the weighing shall be not more than +/- 0.25 e.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "4.5.2",
+        "page": 48
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CREEP_LIMIT",
+      "name": "Permissible variation for creep",
+      "rule": "Delta(0-30 min) <= 0.5 e AND Delta(15-30 min) <= 0.2 e. If not met, Delta(0-4 h) <= |mpe|.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.4.1",
+        "page": 35
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "ZERO_RETURN_LIMIT",
+      "name": "Permissible zero return deviation",
+      "rule": "Zero deviation after unloading a load kept on for 30 min shall not exceed 0.5 e (0.5 e1 for multi-interval).",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.4.2",
+        "page": 35
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "TILTING_LIMIT",
+      "name": "Limiting variation due to tilting",
+      "rule": "At no load: zero shift <= 2 e (except class II). At self-indication capacity & Max: error <= mpe.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.1.1",
+        "page": 33
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "TEMP_EFFECT_NO_LOAD",
+      "name": "Temperature effect on no-load indication",
+      "rule": "Zero indication variation <= 1 e per 1 \u00b0C difference for Class I, and <= 1 e per 5 \u00b0C difference for Class II, III, IIII.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.2.3",
+        "page": 34
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "SPAN_STABILITY_LIMIT",
+      "name": "Span stability error variation",
+      "rule": "Variation in errors of indication across measurements <= max(0.5 e, 0.5 |mpe|).",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "5.3.3 & B.4",
+        "page": 62
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "SIGNIFICANT_FAULT_CRITERIA",
+      "name": "Significant fault limit for disturbances",
+      "rule": "Difference between weight indication due to disturbance and intrinsic indication <= e, OR instrument detects and reacts to significant fault.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.5.5.6 & 5.1.1",
+        "page": 19
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "DURABILITY_LIMIT",
+      "name": "Durability error after endurance test",
+      "rule": "Durability error (intrinsic error after 100 000 loadings minus initial intrinsic error) <= |mpe|.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.4.3",
+        "page": 35
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "SENSITIVITY_LIMIT_CH6",
+      "name": "Sensitivity displacement for non-self-indicating instruments",
+      "rule": "Permanent displacement >= 1mm (Class I/II); >= 2mm (Class III/IIII, Max<=30kg); >= 5mm (Class III/IIII, Max>30kg).",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "6.1",
+        "page": 70
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "SENSE_FUNCTION_LIMIT",
+      "name": "Limits of span variation due to cable temperature",
+      "rule": "Delta_span(Delta_T) <= (1/3) * p_i * mpe.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "C.3.3.2.5",
+        "page": 115
+      },
+      "verification_status": "VERIFIED"
+    }
+  ]
+}e to cable temperature",
+      "rule": "Delta_span(Delta_T) <= (1/3) * p_i * mpe.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "C.3.3.2.5",
+        "page": 115
+      },
+      "verification_status": "REQUIRES_MANUAL_VERIFICATION"
+    }
+  ]
+}

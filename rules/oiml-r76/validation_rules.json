@@ -1,0 +1,245 @@
+{
+  "validation_rules": [
+    {
+      "rule_id": "VAL_CLASSIFICATION_TABLE_3",
+      "name": "Verification scale interval and number of intervals classification limits (Table 3)",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.2",
+        "page": 27,
+        "table": "Table 3"
+      },
+      "classes": [
+        {
+          "class": "I",
+          "e_min_g": 0.001,
+          "e_max_g": null,
+          "n_min": 50000,
+          "n_max": null,
+          "min_capacity_e": 100
+        },
+        {
+          "class": "II",
+          "e_min_g": 0.001,
+          "e_max_g": 0.05,
+          "n_min": 100,
+          "n_max": 100000,
+          "min_capacity_e": 20
+        },
+        {
+          "class": "II",
+          "e_min_g": 0.1,
+          "e_max_g": null,
+          "n_min": 5000,
+          "n_max": 100000,
+          "min_capacity_e": 50
+        },
+        {
+          "class": "III",
+          "e_min_g": 0.1,
+          "e_max_g": 2.0,
+          "n_min": 100,
+          "n_max": 10000,
+          "min_capacity_e": 20
+        },
+        {
+          "class": "III",
+          "e_min_g": 5.0,
+          "e_max_g": null,
+          "n_min": 500,
+          "n_max": 10000,
+          "min_capacity_e": 20
+        },
+        {
+          "class": "IIII",
+          "e_min_g": 5.0,
+          "e_max_g": null,
+          "n_min": 100,
+          "n_max": 1000,
+          "min_capacity_e": 10
+        }
+      ],
+      "exceptions": [
+        "The minimum capacity is reduced to 5 e for grading instruments.",
+        "For an instrument of class I with d < 0.1 mg, n may be less than 50 000 (3.4.4)."
+      ],
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_SCALE_INTERVAL_SERIES",
+      "name": "Form of the scale interval",
+      "rule": "The scale interval for weighing results shall be in the form 1 x 10^k, 2 x 10^k or 5 x 10^k units, where k is a positive or negative integer or zero.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "4.2.2.1",
+        "page": 43
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_ACTUAL_VS_VERIFICATION_INTERVAL",
+      "name": "Relation between d and e",
+      "rule": "The verification scale interval, e, is determined by d < e <= 10 d. For class I instrument with d < 1 mg, e = 1 mg.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.4.2",
+        "page": 29
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_MULTI_INTERVAL_CAPACITY",
+      "name": "Maximum capacity of partial weighing ranges (Table 4)",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.3.3",
+        "page": 28,
+        "table": "Table 4"
+      },
+      "ratios": {
+        "I": "Max_i / e_{i+1} >= 50000",
+        "II": "Max_i / e_{i+1} >= 5000",
+        "III": "Max_i / e_{i+1} >= 500",
+        "IIII": "Max_i / e_{i+1} >= 50"
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_ZERO_SETTING_RANGE",
+      "name": "Zero-setting and zero-tracking range limits",
+      "rules": [
+        "Initial zero-setting device: overall effect not more than 20% of Max.",
+        "Overall effect of zero-setting and zero-tracking devices: not more than 4% of Max."
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "4.5.1",
+        "page": 48
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_LIMITS_OF_INDICATION",
+      "name": "Limits of indication (overload)",
+      "rule": "There shall be no indication above Max + 9 e.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "4.2.3",
+        "page": 44
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_ERROR_APPORTIONING",
+      "name": "Apportioning of errors for modules",
+      "formula": "p1^2 + p2^2 + p3^2 + ... <= 1",
+      "rules": [
+        "Purely digital devices: pi may be 0",
+        "Weighing modules: pi may be 1",
+        "Other modules (including digital load cells): 0.3 <= pi <= 0.8 when more than one module contributes"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.10.2.1",
+        "page": 36
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_STANDARD_WEIGHTS",
+      "name": "Test standard weights requirements",
+      "rule": "Standard weights shall meet OIML R 111. Error shall not be greater than 1/3 of the maximum permissible error of the instrument for the applied load (or uncertainty <= 1/3 mpe for class E2 or better).",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.7.1",
+        "page": 32
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_MODULE_FRACTION_PI",
+      "name": "Fraction p_i specific limits per module type",
+      "rules": [
+        {
+          "module": "Indicator / Analog data processing",
+          "default": 0.5,
+          "allowed_range": [
+            0.3,
+            0.8
+          ],
+          "source": {
+            "standard": "OIML R 76-1",
+            "edition": "2006 (E)",
+            "section": "F.3.2",
+            "page": 129
+          }
+        },
+        {
+          "module": "Digital data processing / Terminal",
+          "fixed_value": 0.0,
+          "source": {
+            "standard": "OIML R 76-1",
+            "edition": "2006 (E)",
+            "section": "D.1.2.1",
+            "page": 118
+          }
+        },
+        {
+          "module": "Weighing module",
+          "fixed_value": 1.0,
+          "source": {
+            "standard": "OIML R 76-1",
+            "edition": "2006 (E)",
+            "section": "E.1.2.1",
+            "page": 122
+          }
+        }
+      ],
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_CH6_HARDNESS",
+      "name": "Hardness of contact parts (Non-self-indicating)",
+      "rule": "Contact parts of knives, bearings, friction plates, etc. shall have a hardness of at least 58 Rockwell C.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "6.3.3",
+        "page": 72
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_CH6_KNIFE_EDGES",
+      "name": "Minimum distance between knife-edges (Steelyards)",
+      "rule": "Minimum distance is 25mm for Max <= 30kg, and 20mm for Max > 30kg.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "6.6.2.1",
+        "page": 73
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "VAL_CH7_MARKINGS",
+      "name": "Compulsory metrological markings",
+      "rule": "Instrument must mark: manufacturer’s mark or name, accuracy class, Max, Min, and e. ",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "7.1.1",
+        "page": 76
+      },
+      "verification_status": "VERIFIED"
+    }
+  ]
+}

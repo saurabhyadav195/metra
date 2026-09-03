@@ -1,0 +1,1127 @@
+{
+  "tests": [
+    {
+      "test_id": "TEST-A.4.2.1",
+      "test_name": "Range of zero-setting",
+      "purpose": "Verify that the zero-setting range complies with the maximum limits (initial zero-setting <= 20% Max, overall zero-setting/tracking <= 4% Max).",
+      "applicability": [
+        "all_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "Max",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Maximum capacity"
+        },
+        {
+          "name": "zero_setting_type",
+          "type": "string",
+          "allowed_values": [
+            "initial",
+            "non_automatic",
+            "semi_automatic",
+            "automatic"
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "positive_range",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "negative_range",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "total_range_percent",
+          "type": "number",
+          "unit": "%"
+        }
+      ],
+      "procedure_summary": "Determine the maximum load that can be re-zeroed by applying test loads and switching off/on or actuating zero-setting command.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "VAL_ZERO_SETTING_RANGE"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.2.1",
+        "page": 87
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.2.3",
+      "test_name": "Accuracy of zero-setting",
+      "purpose": "Verify that after zero setting, the effect of zero deviation on the weighing result is not more than +/- 0.25 e.",
+      "applicability": [
+        "all_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "e",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Verification scale interval"
+        },
+        {
+          "name": "d",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Actual scale interval"
+        }
+      ],
+      "observations": [
+        {
+          "name": "I",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Indicated value at zero"
+        },
+        {
+          "name": "dL",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Additional weights to reach next changeover point"
+        }
+      ],
+      "procedure_summary": "Set instrument to zero, then add small weights (e.g. 0.1 e) until indication changes to 1 scale interval above zero.",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER"
+      ],
+      "evaluation_rule_ids": [
+        "ZERO_SETTING_ACCURACY"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.2.3",
+        "page": 87
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.4.1",
+      "test_name": "Weighing test",
+      "purpose": "Determine errors of indication across the weighing range for increasing and decreasing loads under reference conditions.",
+      "applicability": [
+        "all_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "accuracy_class",
+          "type": "string",
+          "allowed_values": [
+            "I",
+            "II",
+            "III",
+            "IIII"
+          ]
+        },
+        {
+          "name": "Max",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "Min",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "e",
+          "type": "number",
+          "unit": "mass_unit"
+        }
+      ],
+      "observations": [
+        {
+          "name": "test_load_steps",
+          "type": "array",
+          "item_type": "object",
+          "description": "List of load L, indication I, additional load dL for each step"
+        }
+      ],
+      "procedure_summary": "Apply at least 10 different test loads (for initial intrinsic error) or at least 5 test loads (for routine tests), including Min, Max, and mpe changeover points, increasing and decreasing.",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER",
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "MPE_INIT",
+        "MPE_SERVICE"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.4.1",
+        "page": 88
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.6.1",
+      "test_name": "Tare weighing test",
+      "purpose": "Verify that errors of indication with tare device in operation do not exceed MPE for net loads.",
+      "applicability": [
+        "instruments_with_tare"
+      ],
+      "required_inputs": [
+        {
+          "name": "tare_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Applied tare load"
+        },
+        {
+          "name": "tare_type",
+          "type": "string",
+          "allowed_values": [
+            "subtractive",
+            "additive"
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "net_test_steps",
+          "type": "array",
+          "item_type": "object",
+          "description": "Net load L, indication I, additional load dL"
+        }
+      ],
+      "procedure_summary": "Perform weighing tests with at least 5 load steps with tare applied (1 tare value for subtractive tare, 2 tare values for additive tare).",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER",
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "MPE_NET_TARE"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.6.1",
+        "page": 90
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.7",
+      "test_name": "Eccentricity test",
+      "purpose": "Verify that indications for different load positions meet maximum permissible errors.",
+      "applicability": [
+        "all_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "support_points_count",
+          "type": "integer",
+          "description": "Number of points of support n"
+        },
+        {
+          "name": "Max",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "max_additive_tare",
+          "type": "number",
+          "unit": "mass_unit",
+          "default": 0
+        }
+      ],
+      "observations": [
+        {
+          "name": "positions",
+          "type": "array",
+          "item_type": "object",
+          "description": "Position id, load L, indication I, dL, zero error E0"
+        }
+      ],
+      "procedure_summary": "Apply 1/3 (Max + T+) on 4 quarter segments, or 1/(n-1) on each support if n > 4, or 1/10 on each support for hopper/tank. Evaluate each position using changeover point calculation.",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER",
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "MPE_INIT",
+        "ECCENTRICITY_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.7",
+        "page": 90
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.8.2",
+      "test_name": "Discrimination test (digital)",
+      "purpose": "Verify that an extra load equal to 1.4 d placed on the instrument at equilibrium causes an unambiguous change in indication.",
+      "applicability": [
+        "digital_instruments_d_ge_5mg"
+      ],
+      "required_inputs": [
+        {
+          "name": "d",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Actual scale interval"
+        },
+        {
+          "name": "test_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Loads: Min, 1/2 Max, Max"
+        }
+      ],
+      "observations": [
+        {
+          "name": "initial_indication",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "indication_after_1_4d",
+          "type": "number",
+          "unit": "mass_unit"
+        }
+      ],
+      "procedure_summary": "At load L with indication I, remove small weights until indication becomes I-d, add 0.1 d back, then gently add 1.4 d. The indication shall change to I+d.",
+      "calculations": [
+        "CALC_DISCRIMINATION_LOAD"
+      ],
+      "evaluation_rule_ids": [
+        "DISCRIMINATION_CRITERIA"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.8.2",
+        "page": 92
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.9",
+      "test_name": "Sensitivity of a non-self-indicating instrument",
+      "purpose": "Verify permanent displacement of the indicating element when extra load is applied.",
+      "applicability": [
+        "non_self_indicating_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "extra_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Absolute value of MPE, >= 1mg"
+        }
+      ],
+      "observations": [
+        {
+          "name": "displacement",
+          "type": "number",
+          "unit": "mm"
+        }
+      ],
+      "procedure_summary": "Place extra load on instrument while oscillating. Measure linear distance between equilibrium points.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "SENSITIVITY_LIMIT_CH6"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "6.1 & A.4.9",
+        "page": 92
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.10",
+      "test_name": "Repeatability test",
+      "purpose": "Verify that the difference between results of several weighings of the same load is <= |mpe| for that load.",
+      "applicability": [
+        "all_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "test_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "About 50% Max and close to 100% Max"
+        },
+        {
+          "name": "number_of_weighings",
+          "type": "integer",
+          "description": "10 weighings if Max < 1000 kg; 3 weighings otherwise"
+        }
+      ],
+      "observations": [
+        {
+          "name": "indications",
+          "type": "array",
+          "item_type": "number",
+          "unit": "mass_unit"
+        }
+      ],
+      "procedure_summary": "Perform consecutive weighings of the same load deposited in practically identical manner. Reset zero between weighings if needed without recording error at zero.",
+      "calculations": [
+        "CALC_REPEATABILITY_RANGE"
+      ],
+      "evaluation_rule_ids": [
+        "REPEATABILITY_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.10",
+        "page": 93
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.11.1",
+      "test_name": "Creep test",
+      "purpose": "Verify that variation in indication over 30 minutes (or 4 hours) does not exceed permissible limits.",
+      "applicability": [
+        "class_II",
+        "class_III",
+        "class_IIII"
+      ],
+      "required_inputs": [
+        {
+          "name": "Max",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "e",
+          "type": "number",
+          "unit": "mass_unit"
+        }
+      ],
+      "observations": [
+        {
+          "name": "indication_initial",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "indication_15min",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "indication_30min",
+          "type": "number",
+          "unit": "mass_unit"
+        },
+        {
+          "name": "indication_4h",
+          "type": "number",
+          "unit": "mass_unit",
+          "optional": true
+        }
+      ],
+      "procedure_summary": "Load instrument close to Max. Observe indication immediately, at 15 min, and at 30 min. Check delta(0-30m) <= 0.5 e and delta(15-30m) <= 0.2 e.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "CREEP_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.11.1",
+        "page": 93
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.11.2",
+      "test_name": "Zero return test",
+      "purpose": "Verify that zero deviation after 30 minutes loading does not exceed 0.5 e.",
+      "applicability": [
+        "class_II",
+        "class_III",
+        "class_IIII"
+      ],
+      "required_inputs": [
+        {
+          "name": "e",
+          "type": "number",
+          "unit": "mass_unit"
+        }
+      ],
+      "observations": [
+        {
+          "name": "zero_deviation",
+          "type": "number",
+          "unit": "mass_unit"
+        }
+      ],
+      "procedure_summary": "After removing a load close to Max that has remained on the instrument for 30 minutes, observe zero indication as soon as stabilized.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "ZERO_RETURN_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.11.2",
+        "page": 93
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.4.12",
+      "test_name": "Test for the stability of equilibrium",
+      "purpose": "Verify that printing, storing, zeroing, or taring is inhibited during continuous disturbance.",
+      "applicability": [
+        "electronic_instruments",
+        "printers",
+        "data_storage"
+      ],
+      "required_inputs": [
+        {
+          "name": "test_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Up to 50% Max"
+        }
+      ],
+      "procedure_summary": "Manually disturb equilibrium and initiate print/store. Verify output only occurs when stable (<2 adjacent values).",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.12",
+        "page": 93
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.5.1",
+      "test_name": "Tilting test",
+      "purpose": "Determine influence of longitudinal and transverse tilting on indication.",
+      "applicability": [
+        "class_II",
+        "class_III",
+        "class_IIII",
+        "instruments_liable_to_be_tilted"
+      ],
+      "required_inputs": [
+        {
+          "name": "limiting_tilt_value",
+          "type": "string",
+          "description": "Defined by level indicator ring, automatic tilt sensor, or 50/1000"
+        }
+      ],
+      "observations": [
+        {
+          "name": "zero_diff_tilted",
+          "type": "number",
+          "unit": "e"
+        },
+        {
+          "name": "error_at_Max_tilted",
+          "type": "number",
+          "unit": "e"
+        }
+      ],
+      "procedure_summary": "Tilt instrument longitudinally and transversely to limiting value. Evaluate zero shift at no load and error at Max.",
+      "calculations": [
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "TILTING_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.5.1",
+        "page": 94
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.5.2",
+      "test_name": "Warm-up time test",
+      "purpose": "Verify that weighing result is inhibited or meets MPE during and after specified warm-up time.",
+      "applicability": [
+        "electronic_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "disconnect_duration_hours",
+          "type": "number",
+          "default": 8
+        },
+        {
+          "name": "test_intervals_minutes",
+          "type": "array",
+          "default": [
+            5,
+            15,
+            30
+          ]
+        }
+      ],
+      "observations": [
+        {
+          "name": "zero_errors",
+          "type": "array",
+          "item_type": "number"
+        },
+        {
+          "name": "errors_at_Max",
+          "type": "array",
+          "item_type": "number"
+        }
+      ],
+      "procedure_summary": "Disconnect for >= 8h, power on, zero, load near Max at 5, 15, 30 min. Check that errors do not exceed MPE.",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER",
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "MPE_INIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.5.2",
+        "page": 95
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.5.3.1",
+      "test_name": "Static temperatures",
+      "purpose": "Verify compliance with MPE at prescribed temperature limits.",
+      "applicability": [
+        "all_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "T_min",
+          "type": "number",
+          "unit": "\u00b0C"
+        },
+        {
+          "name": "T_max",
+          "type": "number",
+          "unit": "\u00b0C"
+        }
+      ],
+      "observations": [
+        {
+          "name": "weighing_results_by_temp",
+          "type": "object",
+          "description": "Weighing test results at 20\u00b0C, T_high, T_low, 5\u00b0C, 20\u00b0C"
+        }
+      ],
+      "procedure_summary": "Expose EUT to constant temperatures (20\u00b0C, specified high, specified low, 5\u00b0C if low <= 0\u00b0C, 20\u00b0C) for 2h after temperature stability. Perform weighing tests.",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER",
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "MPE_INIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.5.3.1",
+        "page": 96
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.5.3.2",
+      "test_name": "Temperature effect on no-load indication",
+      "purpose": "Verify that zero indication does not vary by > 1 e per 1 \u00b0C (Class I) or 5 \u00b0C (other classes).",
+      "applicability": [
+        "all_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "accuracy_class",
+          "type": "string"
+        },
+        {
+          "name": "e",
+          "type": "number",
+          "unit": "mass_unit"
+        }
+      ],
+      "observations": [
+        {
+          "name": "zero_drift_per_K",
+          "type": "number",
+          "unit": "e/K"
+        }
+      ],
+      "procedure_summary": "Set instrument to zero at reference temp, change to high, low, 5\u00b0C. Determine zero error at each stage and calculate change per 1 K or 5 K.",
+      "calculations": [
+        "CALC_TEMP_ZERO_DRIFT"
+      ],
+      "evaluation_rule_ids": [
+        "TEMP_EFFECT_NO_LOAD"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.5.3.2",
+        "page": 96
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.5.4",
+      "test_name": "Voltage variations",
+      "purpose": "Verify instrument performance under specified power supply voltage limits.",
+      "applicability": [
+        "electronic_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "power_supply_type",
+          "type": "string",
+          "allowed_values": [
+            "ac_mains",
+            "external_plugin",
+            "battery_non_rechargeable",
+            "vehicle_battery"
+          ]
+        },
+        {
+          "name": "U_nom",
+          "type": "number",
+          "unit": "V"
+        }
+      ],
+      "observations": [
+        {
+          "name": "indications_at_voltage_limits",
+          "type": "array",
+          "item_type": "object"
+        }
+      ],
+      "procedure_summary": "Test loads of 10 e and load between 1/2 Max and Max at upper and lower voltage limits.",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER",
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "MPE_INIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.5.4",
+        "page": 96
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-A.6",
+      "test_name": "Endurance test",
+      "purpose": "Verify that durability error due to wear and tear does not exceed MPE after 100 000 load cycles.",
+      "applicability": [
+        "class_II",
+        "class_III",
+        "class_IIII",
+        "Max_le_100kg"
+      ],
+      "required_inputs": [
+        {
+          "name": "load_cycles",
+          "type": "integer",
+          "default": 100000
+        },
+        {
+          "name": "test_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Approximately 50% Max"
+        }
+      ],
+      "observations": [
+        {
+          "name": "initial_intrinsic_error_curve",
+          "type": "array"
+        },
+        {
+          "name": "final_error_curve",
+          "type": "array"
+        },
+        {
+          "name": "durability_error",
+          "type": "number",
+          "unit": "e"
+        }
+      ],
+      "procedure_summary": "Perform weighing test before endurance. Apply 50% Max load 100 000 times. Perform weighing test after. Evaluate durability error = intrinsic_after - intrinsic_before.",
+      "calculations": [
+        "CALC_DURABILITY_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "DURABILITY_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.6",
+        "page": 97
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-B.2",
+      "test_name": "Damp heat, steady state",
+      "purpose": "Verify performance under high humidity (85% RH) at the upper limit of temperature range.",
+      "applicability": [
+        "electronic_instruments_except_class_I_and_class_II_e_lt_1g"
+      ],
+      "required_inputs": [
+        {
+          "name": "T_high",
+          "type": "number",
+          "unit": "\u00b0C"
+        },
+        {
+          "name": "relative_humidity",
+          "type": "number",
+          "unit": "%",
+          "default": 85
+        }
+      ],
+      "observations": [
+        {
+          "name": "indications_during_damp_heat",
+          "type": "array"
+        }
+      ],
+      "procedure_summary": "Test at reference temp (50% RH), then at T_high with 85% RH for 2 days after stabilization, then at reference temp (50% RH).",
+      "calculations": [
+        "CALC_ERROR_CHANGEOVER",
+        "CALC_CORRECTED_ERROR"
+      ],
+      "evaluation_rule_ids": [
+        "MPE_INIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "B.2",
+        "page": 100
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-B.3.1",
+      "test_name": "AC mains voltage dips and short interruptions",
+      "purpose": "Verify immunity to AC mains voltage dips and interruptions.",
+      "applicability": [
+        "ac_mains_electronic_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "test_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "One small test load"
+        }
+      ],
+      "observations": [
+        {
+          "name": "indication_difference",
+          "type": "number",
+          "unit": "e"
+        },
+        {
+          "name": "significant_fault_detected",
+          "type": "boolean"
+        }
+      ],
+      "procedure_summary": "Apply voltage reductions (Test a: 0% 0.5 cycle, b: 0% 1 cycle, c: 40% 10 cycles, d: 70% 25 cycles, e: 80% 250 cycles, short interruption: 0% 250 cycles) 10 times each.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "SIGNIFICANT_FAULT_CRITERIA"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "B.3.1",
+        "page": 101
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-B.3.2",
+      "test_name": "Bursts (fast transients)",
+      "purpose": "Verify immunity to electrical fast transient bursts on power and I/O lines.",
+      "applicability": [
+        "electronic_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "power_lines_amplitude_kV",
+          "type": "number",
+          "default": 1.0
+        },
+        {
+          "name": "io_lines_amplitude_kV",
+          "type": "number",
+          "default": 0.5
+        }
+      ],
+      "observations": [
+        {
+          "name": "indication_difference",
+          "type": "number",
+          "unit": "e"
+        },
+        {
+          "name": "significant_fault_detected",
+          "type": "boolean"
+        }
+      ],
+      "procedure_summary": "Apply Level 2 bursts (1 kV power lines, 0.5 kV I/O lines) with positive and negative polarity for at least 1 minute each with one small test load.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "SIGNIFICANT_FAULT_CRITERIA"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "B.3.2",
+        "page": 101
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-B.3.4",
+      "test_name": "Electrostatic discharge (ESD)",
+      "purpose": "Verify immunity to direct and indirect electrostatic discharges.",
+      "applicability": [
+        "electronic_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "contact_discharge_kV",
+          "type": "number",
+          "default": 6.0
+        },
+        {
+          "name": "air_discharge_kV",
+          "type": "number",
+          "default": 8.0
+        }
+      ],
+      "observations": [
+        {
+          "name": "indication_difference",
+          "type": "number",
+          "unit": "e"
+        },
+        {
+          "name": "significant_fault_detected",
+          "type": "boolean"
+        }
+      ],
+      "procedure_summary": "Apply at least 10 discharges (Level 3: up to 6 kV contact, 8 kV air) with at least 10s intervals using one small test load.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "SIGNIFICANT_FAULT_CRITERIA"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "B.3.4",
+        "page": 103
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-B.3.5",
+      "test_name": "Immunity to radiated electromagnetic fields",
+      "purpose": "Verify immunity to RF radiated electromagnetic fields (80 MHz - 2000 MHz, 10 V/m).",
+      "applicability": [
+        "electronic_instruments"
+      ],
+      "required_inputs": [
+        {
+          "name": "field_strength_V_m",
+          "type": "number",
+          "default": 10.0
+        },
+        {
+          "name": "frequency_range",
+          "type": "string",
+          "default": "80 MHz to 2000 MHz (26 MHz if no I/O ports)"
+        },
+        {
+          "name": "modulation",
+          "type": "string",
+          "default": "80% AM, 1 kHz sine wave"
+        }
+      ],
+      "observations": [
+        {
+          "name": "indication_difference",
+          "type": "number",
+          "unit": "e"
+        },
+        {
+          "name": "significant_fault_detected",
+          "type": "boolean"
+        }
+      ],
+      "procedure_summary": "Expose EUT with one small test load to 10 V/m field in anechoic chamber. Check diff <= e or significant fault handled.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "SIGNIFICANT_FAULT_CRITERIA"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "B.3.5",
+        "page": 103
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-B.3.6",
+      "test_name": "Immunity to conducted radio-frequency fields",
+      "purpose": "Verify immunity to conducted RF disturbances on lines (0.15 MHz - 80 MHz, 10 V emf).",
+      "applicability": [
+        "electronic_instruments_with_cables"
+      ],
+      "required_inputs": [
+        {
+          "name": "frequency_range",
+          "type": "string",
+          "default": "0.15 MHz to 80 MHz"
+        },
+        {
+          "name": "rf_amplitude_V",
+          "type": "number",
+          "default": 10.0
+        }
+      ],
+      "observations": [
+        {
+          "name": "indication_difference",
+          "type": "number",
+          "unit": "e"
+        },
+        {
+          "name": "significant_fault_detected",
+          "type": "boolean"
+        }
+      ],
+      "procedure_summary": "Inject conducted RF (10 V emf, 80% AM 1 kHz) into cables with one small test load. Verify diff <= e or significant fault handled.",
+      "calculations": [],
+      "evaluation_rule_ids": [
+        "SIGNIFICANT_FAULT_CRITERIA"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "B.3.6",
+        "page": 104
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-B.4",
+      "test_name": "Span stability test",
+      "purpose": "Verify span stability over a 28-day period (or duration of performance tests).",
+      "applicability": [
+        "electronic_instruments_except_class_I"
+      ],
+      "required_inputs": [
+        {
+          "name": "test_duration_days",
+          "type": "integer",
+          "default": 28
+        },
+        {
+          "name": "test_load",
+          "type": "number",
+          "unit": "mass_unit",
+          "description": "Near Max"
+        }
+      ],
+      "observations": [
+        {
+          "name": "measurements",
+          "type": "array",
+          "item_type": "object",
+          "min_items": 8,
+          "description": "Date, temp, pressure, humidity, indication, error"
+        }
+      ],
+      "procedure_summary": "Perform at least 8 measurements near Max over up to 28 days. Variation in error across all measurements shall not exceed 0.5 e or 0.5 |mpe| (whichever is greater).",
+      "calculations": [
+        "CALC_SPAN_VARIATION"
+      ],
+      "evaluation_rule_ids": [
+        "SPAN_STABILITY_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "B.4",
+        "page": 106
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "test_id": "TEST-C.3.3",
+      "test_name": "Testing the sense function (6-wire connection)",
+      "purpose": "Verify the indicator's ability to compensate for cable resistance variations due to temperature.",
+      "applicability": [
+        "indicators_with_6_wire"
+      ],
+      "required_inputs": [
+        {
+          "name": "R_cable",
+          "type": "number",
+          "unit": "ohm"
+        }
+      ],
+      "observations": [
+        {
+          "name": "span_variation",
+          "type": "number",
+          "unit": "e"
+        }
+      ],
+      "procedure_summary": "Simulate max cable length and load cells. Induce Delta_R_Temp in excitation/sense lines. Measure span shift.",
+      "calculations": [
+        "CALC_CABLE_RESISTANCE",
+        "CALC_DELTA_R_TEMP",
+        "CALC_SENSE_SPAN_VARIATION"
+      ],
+      "evaluation_rule_ids": [
+        "SENSE_FUNCTION_LIMIT"
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "C.3.3",
+        "page": 114
+      },
+      "verification_status": "VERIFIED"
+    }
+  ]
+}

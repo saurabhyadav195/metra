@@ -4,6 +4,7 @@ import { ProtectedRoute } from '@/routes/ProtectedRoute'
 import { RoleRoute } from '@/routes/RoleRoute'
 
 import LoginPage from '@/pages/auth/LoginPage'
+import RegisterPage from '@/pages/auth/RegisterPage'
 import OwnerDashboard from '@/pages/owner/OwnerDashboard'
 import AdminDashboard from '@/pages/admin/AdminDashboard'
 import EngineerDashboard from '@/pages/engineer/EngineerDashboard'
@@ -15,6 +16,7 @@ export default function App() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
 
           {/* Protected application area */}
           <Route path="/app" element={<ProtectedRoute />}>
@@ -43,7 +45,7 @@ export default function App() {
                 </RoleRoute>
               }
             />
-            {/* Generic /app and /app/dashboard — redirect based on role handled by login */}
+            {/* Generic /app — redirect to login */}
             <Route path="dashboard" element={<Navigate to="/login" replace />} />
             <Route index element={<Navigate to="/login" replace />} />
           </Route>

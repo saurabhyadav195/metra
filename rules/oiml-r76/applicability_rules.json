@@ -1,0 +1,278 @@
+{
+  "standard": {
+    "name": "OIML R 76-1",
+    "title": "Non-automatic weighing instruments — Part 1: Metrological and technical requirements — Tests",
+    "edition": "2006 (E)"
+  },
+  "applicability_rules": [
+    {
+      "rule_id": "APP-CLASS-I",
+      "description": "Applies to instruments of Special Accuracy Class I.",
+      "conditions": [
+        {
+          "field": "accuracy_class",
+          "operator": "==",
+          "value": "I"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.1.1",
+        "page": 26
+      }
+    },
+    {
+      "rule_id": "APP-CLASS-II",
+      "description": "Applies to instruments of High Accuracy Class II.",
+      "conditions": [
+        {
+          "field": "accuracy_class",
+          "operator": "==",
+          "value": "II"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.1.1",
+        "page": 26
+      }
+    },
+    {
+      "rule_id": "APP-CLASS-III",
+      "description": "Applies to instruments of Medium Accuracy Class III.",
+      "conditions": [
+        {
+          "field": "accuracy_class",
+          "operator": "==",
+          "value": "III"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.1.1",
+        "page": 26
+      }
+    },
+    {
+      "rule_id": "APP-CLASS-IIII",
+      "description": "Applies to instruments of Ordinary Accuracy Class IIII.",
+      "conditions": [
+        {
+          "field": "accuracy_class",
+          "operator": "==",
+          "value": "IIII"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.1.1",
+        "page": 26
+      }
+    },
+    {
+      "rule_id": "APP-MULTI-INTERVAL",
+      "description": "Applies to multi-interval instruments; the additional requirements of 3.3 apply.",
+      "conditions": [
+        {
+          "field": "instrument_type",
+          "operator": "==",
+          "value": "multi_interval"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.3",
+        "page": 27
+      }
+    },
+    {
+      "rule_id": "APP-MULTIPLE-RANGE",
+      "description": "Applies to multiple-range instruments; each weighing range is treated as an instrument with one range, with the associated selection requirements applying.",
+      "conditions": [
+        {
+          "field": "instrument_type",
+          "operator": "==",
+          "value": "multiple_range"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.2 and 4.10",
+        "page": 27
+      }
+    },
+    {
+      "rule_id": "APP-ELECTRONIC",
+      "description": "Applies to electronic instruments; Chapter 5 and applicable electronic tests in Annex B apply.",
+      "conditions": [
+        {
+          "field": "is_electronic",
+          "operator": "==",
+          "value": true
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "5 and Annex B",
+        "page": 61
+      }
+    },
+    {
+      "rule_id": "APP-MOBILE",
+      "description": "Applies to mobile instruments mounted on or incorporated into a vehicle; additional requirements of 4.18 apply.",
+      "conditions": [
+        {
+          "field": "is_mobile",
+          "operator": "==",
+          "value": true
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "4.18",
+        "page": 59
+      }
+    },
+    {
+      "rule_id": "APP-DIRECT-SALES",
+      "description": "Applies to instruments intended for direct sales to the public; 4.13 applies, with 4.14 additionally applicable to price-computing instruments.",
+      "conditions": [
+        {
+          "field": "direct_sales_to_public",
+          "operator": "==",
+          "value": true
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "4.13 and 4.14",
+        "page": 55
+      }
+    },
+    {
+      "rule_id": "APP-ENDURANCE",
+      "description": "Applies to the endurance test for accuracy classes II, III and IIII when Max is not greater than 100 kg. The test is performed according to A.6.",
+      "conditions": [
+        {
+          "field": "accuracy_class",
+          "operator": "in",
+          "value": [
+            "II",
+            "III",
+            "IIII"
+          ]
+        },
+        {
+          "field": "Max_kg",
+          "operator": "<=",
+          "value": 100
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.4.3 and A.6",
+        "page": 35
+      }
+    },
+    {
+      "rule_id": "APP-NON-SELF-INDICATING",
+      "description": "Applies to non-self-indicating instruments; Chapter 6 technical requirements apply.",
+      "conditions": [
+        {
+          "field": "instrument_type",
+          "operator": "==",
+          "value": "non_self_indicating"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "6",
+        "page": 69
+      }
+    },
+    {
+      "rule_id": "APP-MODULE-ANALOG",
+      "description": "Applies when an indicator or analog data processing device is separately tested as a module; Annex C defines the applicable requirements and tests.",
+      "conditions": [
+        {
+          "field": "component_type",
+          "operator": "in",
+          "value": [
+            "indicator",
+            "analog_data_processor"
+          ]
+        },
+        {
+          "field": "separately_tested_module",
+          "operator": "==",
+          "value": true
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.10.2.2 and Annex C",
+        "page": 108
+      }
+    },
+    {
+      "rule_id": "APP-MODULE-DIGITAL",
+      "description": "Applies when a digital data processing device, terminal or digital display is separately tested as a module; Annex D defines the applicable requirements and tests.",
+      "conditions": [
+        {
+          "field": "component_type",
+          "operator": "in",
+          "value": [
+            "terminal",
+            "digital_display",
+            "digital_data_processor"
+          ]
+        },
+        {
+          "field": "separately_tested_module",
+          "operator": "==",
+          "value": true
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.10.2.2 and Annex D",
+        "page": 118
+      }
+    },
+    {
+      "rule_id": "APP-MODULE-WEIGHING",
+      "description": "Applies when a weighing module is separately tested as a module; Annex E defines the applicable requirements and tests.",
+      "conditions": [
+        {
+          "field": "component_type",
+          "operator": "==",
+          "value": "weighing_module"
+        },
+        {
+          "field": "separately_tested_module",
+          "operator": "==",
+          "value": true
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.10.2.2 and Annex E",
+        "page": 122
+      }
+    }
+  ]
+}

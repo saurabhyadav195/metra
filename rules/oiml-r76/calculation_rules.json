@@ -1,0 +1,433 @@
+{
+  "calculation_rules": [
+    {
+      "rule_id": "CALC_N",
+      "name": "Number of verification scale intervals",
+      "formula_human": "n = Max / e",
+      "formula_expression": "Max / e",
+      "inputs": [
+        {
+          "symbol": "Max",
+          "name": "Maximum capacity",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "e",
+          "name": "Verification scale interval",
+          "unit": "mass_unit"
+        }
+      ],
+      "output": {
+        "symbol": "n",
+        "name": "Verification scale intervals count",
+        "unit": "dimensionless"
+      },
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "T.3.2.5",
+        "page": 14
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_ERROR_CHANGEOVER",
+      "name": "Indication prior to rounding and uncorrected error (changeover point method)",
+      "formula_human": "P = I + 0.5*e - dL; E = P - L",
+      "formula_expression": "P = I + 0.5 * e - dL; E = P - L",
+      "inputs": [
+        {
+          "symbol": "I",
+          "name": "Indicated value",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "L",
+          "name": "Test load",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "e",
+          "name": "Verification scale interval",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "dL",
+          "name": "Additional weights added until indication changes to I+e",
+          "unit": "mass_unit"
+        }
+      ],
+      "outputs": [
+        {
+          "symbol": "P",
+          "name": "Indication prior to rounding",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "E",
+          "name": "Error prior to rounding",
+          "unit": "mass_unit"
+        }
+      ],
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.4.3",
+        "page": 88
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_CORRECTED_ERROR",
+      "name": "Corrected error prior to rounding",
+      "formula_human": "Ec = E - E0",
+      "formula_expression": "E - E0",
+      "inputs": [
+        {
+          "symbol": "E",
+          "name": "Error prior to rounding at load L",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "E0",
+          "name": "Error calculated at zero or load close to zero",
+          "unit": "mass_unit"
+        }
+      ],
+      "output": {
+        "symbol": "Ec",
+        "name": "Corrected error",
+        "unit": "mass_unit"
+      },
+      "decision_criteria": "|Ec| <= mpe",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "A.4.4.3",
+        "page": 89
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_REPEATABILITY_RANGE",
+      "name": "Repeatability range",
+      "formula_human": "Range = I_max - I_min",
+      "formula_expression": "I_max - I_min",
+      "inputs": [
+        {
+          "symbol": "I_max",
+          "name": "Maximum observed indication",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "I_min",
+          "name": "Minimum observed indication",
+          "unit": "mass_unit"
+        }
+      ],
+      "output": {
+        "symbol": "Range",
+        "name": "Difference between results",
+        "unit": "mass_unit"
+      },
+      "decision_criteria": "Range <= |mpe|",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.6.1 & A.4.10",
+        "page": 31
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_DISCRIMINATION_LOAD",
+      "name": "Discrimination additional load",
+      "formula_human": "Extra load = 1.4 * d",
+      "formula_expression": "1.4 * d",
+      "inputs": [
+        {
+          "symbol": "d",
+          "name": "Actual scale interval",
+          "unit": "mass_unit"
+        }
+      ],
+      "output": {
+        "symbol": "Extra_load",
+        "name": "Discrimination test extra load",
+        "unit": "mass_unit"
+      },
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.8.2.2 & A.4.8.2",
+        "page": 32
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_TEMP_ZERO_DRIFT",
+      "name": "Temperature zero drift per K",
+      "formula_human": "ZeroDrift = (E0_T2 - E0_T1) / (T2 - T1)",
+      "formula_expression": "(E0_T2 - E0_T1) / (T2 - T1)",
+      "inputs": [
+        {
+          "symbol": "E0_T1",
+          "name": "Zero error at temperature T1",
+          "unit": "e"
+        },
+        {
+          "symbol": "E0_T2",
+          "name": "Zero error at temperature T2",
+          "unit": "e"
+        },
+        {
+          "symbol": "T1",
+          "name": "First temperature",
+          "unit": "\u00b0C"
+        },
+        {
+          "symbol": "T2",
+          "name": "Second temperature",
+          "unit": "\u00b0C"
+        }
+      ],
+      "output": {
+        "symbol": "ZeroDrift",
+        "name": "Zero drift per K",
+        "unit": "e/K"
+      },
+      "decision_criteria": "Class I: |ZeroDrift| <= 1 e / 1 K; Other classes: |ZeroDrift| <= 1 e / 5 K (0.2 e/K)",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.2.3 & A.5.3.2",
+        "page": 34
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_DURABILITY_ERROR",
+      "name": "Durability error",
+      "formula_human": "Durability_Error = Intrinsic_Error_Final - Initial_Intrinsic_Error",
+      "formula_expression": "Intrinsic_Error_Final - Initial_Intrinsic_Error",
+      "inputs": [
+        {
+          "symbol": "Initial_Intrinsic_Error",
+          "name": "Intrinsic error before endurance test",
+          "unit": "mass_unit"
+        },
+        {
+          "symbol": "Intrinsic_Error_Final",
+          "name": "Intrinsic error after endurance test",
+          "unit": "mass_unit"
+        }
+      ],
+      "output": {
+        "symbol": "Durability_Error",
+        "name": "Durability error",
+        "unit": "mass_unit"
+      },
+      "decision_criteria": "|Durability_Error| <= |mpe|",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.9.4.3 & A.6",
+        "page": 35
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_SPAN_VARIATION",
+      "name": "Span stability error variation",
+      "formula_human": "V = E_SP_max - E_SP_min",
+      "formula_expression": "E_SP_max - E_SP_min",
+      "inputs": [
+        {
+          "symbol": "E_SP_max",
+          "name": "Maximum error observed across span measurements",
+          "unit": "e"
+        },
+        {
+          "symbol": "E_SP_min",
+          "name": "Minimum error observed across span measurements",
+          "unit": "e"
+        },
+        {
+          "symbol": "mpe",
+          "name": "Maximum permissible error for test load",
+          "unit": "e"
+        }
+      ],
+      "output": {
+        "symbol": "V",
+        "name": "Variation in errors of indication",
+        "unit": "e"
+      },
+      "decision_criteria": "V <= max(0.5 e, 0.5 * |mpe|)",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "5.3.3 & B.4",
+        "page": 62
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_Q_FACTOR",
+      "name": "Correction factor Q for module compatibility",
+      "formula_human": "Q = (Max + DL + IZSR + NUD + T+) / Max",
+      "formula_expression": "(Max + DL + IZSR + NUD + T_plus) / Max",
+      "inputs": [
+        {
+          "symbol": "Max",
+          "name": "Maximum capacity",
+          "unit": "kg"
+        },
+        {
+          "symbol": "DL",
+          "name": "Dead load of load receptor",
+          "unit": "kg"
+        },
+        {
+          "symbol": "IZSR",
+          "name": "Initial zero setting range",
+          "unit": "kg"
+        },
+        {
+          "symbol": "NUD",
+          "name": "Correction for non-uniform distributed load",
+          "unit": "kg"
+        },
+        {
+          "symbol": "T_plus",
+          "name": "Additive tare",
+          "unit": "kg",
+          "default": 0
+        }
+      ],
+      "output": {
+        "symbol": "Q",
+        "name": "Correction factor",
+        "unit": "dimensionless"
+      },
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "F.1",
+        "page": 127
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_LOAD_CELL_VMIN",
+      "name": "Compatibility check for minimum load cell verification interval",
+      "formula_human": "vmin <= e1 * R / sqrt(N)",
+      "formula_expression": "(e1 * R) / (N ** 0.5)",
+      "inputs": [
+        {
+          "symbol": "e1",
+          "name": "Verification scale interval (smallest)",
+          "unit": "kg"
+        },
+        {
+          "symbol": "R",
+          "name": "Reduction ratio FM / FL",
+          "unit": "dimensionless"
+        },
+        {
+          "symbol": "N",
+          "name": "Number of load cells",
+          "unit": "dimensionless"
+        }
+      ],
+      "output": {
+        "symbol": "vmin_limit",
+        "name": "Maximum permitted vmin",
+        "unit": "kg"
+      },
+      "decision_criteria": "vmin <= vmin_limit",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "F.2.7",
+        "page": 128
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_CABLE_RESISTANCE",
+      "name": "Resistance of a single wire",
+      "formula_human": "R_cable = (rho * l) / A",
+      "formula_expression": "(rho * l) / A",
+      "inputs": [
+        {
+          "symbol": "rho",
+          "name": "Specific resistance",
+          "unit": "ohm*mm2/m"
+        },
+        {
+          "symbol": "l",
+          "name": "Cable length",
+          "unit": "m"
+        },
+        {
+          "symbol": "A",
+          "name": "Cross section",
+          "unit": "mm2"
+        }
+      ],
+      "output": {
+        "symbol": "R_cable",
+        "name": "Wire resistance",
+        "unit": "ohm"
+      },
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "C.3.3.2.4",
+        "page": 115
+      },
+      "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_DELTA_R_TEMP",
+      "name": "Variation of resistance due to temperature",
+      "formula_human": "Delta_R_Temp = R_cable * alpha * (T_max - T_min)",
+      "formula_expression": "R_cable * alpha * (T_max - T_min)",
+      "inputs": [
+        {
+          "symbol": "R_cable",
+          "name": "Wire resistance",
+          "unit": "ohm"
+        },
+        {
+          "symbol": "alpha",
+          "name": "Temperature coefficient",
+          "unit": "1/K"
+        },
+        {
+          "symbol": "T_max",
+          "name": "Upper limit temperature",
+          "unit": "C"
+        },
+        {
+          "symbol": "T_min",
+          "name": "Lower limit temperature",
+          "unit": "C"
+        }
+      ],
+      "output": {
+        "symbol": "Delta_R_Temp",
+        "name": "Resistance variation",
+        "unit": "ohm"
+      },
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "C.3.3.2.4",
+        "page": 115
+      },
+      "verification_status": "VERIFIED"
+    }
+  ]
+}

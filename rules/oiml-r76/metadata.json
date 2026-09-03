@@ -1,0 +1,26 @@
+{
+  "standard": "OIML R 76-1",
+  "title": "Non-automatic weighing instruments Part 1: Metrological and technical requirements - Tests",
+  "edition": "2006 (E)",
+  "publication_year": "2006",
+  "language": "English",
+  "source_document": "r076-1-e06.pdf",
+  "source_type": "Official OIML Recommendation",
+  "extraction_status": "TRUE_ULTIMATE",
+  "verification_status": "VERIFIED",
+  "schema_version": "2.0.0",
+  "application": "METRA",
+  "coverage": [
+    "Chapter 3: Metrological requirements",
+    "Chapter 4: Technical requirements for self-indicating",
+    "Chapter 5: Technical requirements for electronic instruments",
+    "Chapter 6: Technical requirements for non-self-indicating",
+    "Chapter 7: Marking of instruments and modules",
+    "Annex A: Testing procedures",
+    "Annex B: Additional tests for electronic instruments",
+    "Annex C: Testing indicators and analog modules",
+    "Annex D: Testing digital modules",
+    "Annex E: Testing weighing modules",
+    "Annex F: Compatibility checking of modules"
+  ]
+}
