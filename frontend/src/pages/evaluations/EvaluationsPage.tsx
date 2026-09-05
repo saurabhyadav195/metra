@@ -137,20 +137,20 @@ export default function EvaluationsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm" role="table">
               <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <tr className="border-b border-border bg-muted/70">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Evaluation ID
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     OIML Edition
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Status
                   </th>
-                  <th className="hidden px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide lg:table-cell">
+                  <th className="hidden px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide lg:table-cell">
                     Created
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wide">
                     Action
                   </th>
                 </tr>

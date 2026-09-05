@@ -24,11 +24,11 @@ export interface PositionRow {
 }
 
 const DEFAULT_POSITIONS: PositionRow[] = [
-  { position: "Center", load: 100, indication: 100.0 },
-  { position: "Front", load: 100, indication: 100.1 },
-  { position: "Rear", load: 100, indication: 99.9 },
-  { position: "Left", load: 100, indication: 100.0 },
-  { position: "Right", load: 100, indication: 100.1 },
+  { position: "Center", load: 5.00, indication: 5.00 },
+  { position: "Front", load: 5.00, indication: 5.00 },
+  { position: "Rear", load: 5.00, indication: 5.00 },
+  { position: "Left", load: 5.00, indication: 5.00 },
+  { position: "Right", load: 5.00, indication: 5.00 },
 ];
 
 export function EccentricityTestForm({
@@ -40,21 +40,28 @@ export function EccentricityTestForm({
     observations?.positions && Array.isArray(observations.positions) && observations.positions.length > 0
       ? observations.positions.map((p: any) => ({
           position: p.position || "Unknown",
-          load: p.L !== undefined ? p.L : (p.load !== undefined ? p.load : 100),
-          indication: p.I !== undefined ? p.I : (p.indication !== undefined ? p.indication : 100),
+          load: p.L !== undefined ? Number(p.L) : (p.load !== undefined ? Number(p.load) : (p.applied_load !== undefined ? Number(p.applied_load) : 5.00)),
+          indication: p.I !== undefined ? Number(p.I) : (p.indication !== undefined ? Number(p.indication) : (p.indicated_value !== undefined ? Number(p.indicated_value) : 5.00)),
         }))
       : DEFAULT_POSITIONS;
 
   const [positions, setPositions] = useState<PositionRow[]>(initialPositions);
 
   useEffect(() => {
+    const formatted = positions.map((p) => ({
+      position: p.position,
+      L: Number(p.load),
+      I: Number(p.indication),
+      load: Number(p.load),
+      indication: Number(p.indication),
+      applied_load: Number(p.load),
+      indicated_value: Number(p.indication),
+      dL: 0,
+    }));
+
     onObservationsChange({
-      positions: positions.map((p) => ({
-        position: p.position,
-        L: p.load,
-        I: p.indication,
-        dL: 0,
-      })),
+      positions: formatted,
+      load_steps: formatted,
     });
   }, [positions]);
 

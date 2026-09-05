@@ -58,13 +58,12 @@ class RuleEvaluator:
                 calculated_at=datetime.utcnow().isoformat()
             )
 
-        # 2. Input Validation
+        # 2. Input Validation & Logging
         validations: List[ValidationResult] = []
         # Validate instrument context parameters
         validations.extend(self.validator.validate_instrument_context(context))
-        # Validate observation inputs against test schema if observations provided
-        if observations:
-            validations.extend(self.validator.validate_test_observations(test_def, observations))
+        # Validate observation inputs against test schema with instrument context
+        validations.extend(self.validator.validate_test_observations(test_def, observations, context))
 
         val_fails = [v for v in validations if v.status == "FAIL"]
 

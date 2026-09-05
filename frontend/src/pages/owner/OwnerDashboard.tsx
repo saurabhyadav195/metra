@@ -118,7 +118,7 @@ export default function OwnerDashboard() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-left text-xs">
                         <thead>
-                          <tr className="border-b border-border bg-muted/30 text-muted-foreground font-medium">
+                          <tr className="border-b border-border bg-muted/70 text-foreground font-medium">
                             <th className="py-2.5 px-3">Evaluation ID</th>
                             <th className="py-2.5 px-3">Instrument</th>
                             <th className="py-2.5 px-3">Serial No</th>

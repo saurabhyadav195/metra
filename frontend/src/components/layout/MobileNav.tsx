@@ -210,15 +210,11 @@ export function MobileNav({ isOpen, onClose }: MobileNavProps) {
           </ul>
         </nav>
 
-        {/* Footer: OIML + Sign out */}
-        <div className="border-t border-border px-3 py-3 space-y-1">
-          <div className="flex items-center gap-2 px-3 py-1 text-[11px] text-muted-foreground">
-            <HugeiconsIcon icon={ScaleIcon} strokeWidth={1.5} className="size-3.5" />
-            <span>OIML R-76 Platform</span>
-          </div>
+        {/* Footer: Sign out */}
+        <div className="border-t border-border px-3 py-3">
           <button
             onClick={handleSignOut}
-            className="flex h-9 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-10 w-full items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             aria-label="Sign out of METRA"
           >
             <HugeiconsIcon icon={Logout01Icon} strokeWidth={1.5} className="size-4 shrink-0" />

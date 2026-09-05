@@ -1,6 +1,27 @@
 /**
  * METRA — components/evaluations/forms/TestFormDispatcher.tsx
- * Dynamic dispatcher rendering test-specific observation forms based on test_id / test_code
+ * Dynamic dispatcher rendering test-specific observation forms based on test_id / test_code.
+ *
+ * CRITICAL CONTRACT:
+ *  - Never returns undefined / null — always renders a valid component.
+ *  - All matched test IDs are checked BEFORE broad string-includes rules
+ *    so a specific test is never accidentally caught by a generic pattern.
+ *  - Falls back to GenericObservationForm for any unrecognised test.
+ *  - Never crashes: the ErrorBoundary in TestExecutionPage wraps this component,
+ *    but we also guarantee every branch returns a renderable element.
+ *
+ * TEST-SPECIFIC ROUTING ORDER (most-specific first):
+ *  TEST-A.4.2.1 / TEST-A.4.2.3 / TEST-A.4.11.2  → ZeroSettingTestForm
+ *  TEST-A.4.4.1                                   → WeighingTestForm
+ *  TEST-A.4.6.1                                   → TareTestForm
+ *  TEST-A.4.7                                     → EccentricityTestForm
+ *  TEST-A.4.10                                    → RepeatabilityTestForm
+ *  TEST-A.4.12                                    → WeighingTestForm (Stability of Equilibrium)
+ *  TEST-A.5.3.x                                   → TemperatureTestForm
+ *  TEST-A.5.4 / TEST-A.5.2                        → VoltageVariationTestForm
+ *  TEST-B.x / TEST-C.x                            → EMCElectricalTestForm
+ *  Generic keyword matches                        → appropriate specialist or generic
+ *  Fallback                                       → GenericObservationForm
  */
 
 import { WeighingTestForm } from "./WeighingTestForm";
@@ -31,116 +52,113 @@ export function TestFormDispatcher({
   const normalizedId = (testId || "").toUpperCase().trim();
   const lowerId = (testId || "").toLowerCase().trim();
 
-  // 1. Weighing Test (TEST-A.4.4.1 / weighing_test)
-  if (normalizedId === "TEST-A.4.4.1" || lowerId.includes("weighing_test") || lowerId === "weighing") {
-    return (
-      <WeighingTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
-  }
+  const commonProps = {
+    testId,
+    testName,
+    observations,
+    onObservationsChange,
+    disabled,
+  };
 
-  // 2. Repeatability Test (TEST-A.4.10 / repeatability_test)
-  if (normalizedId === "TEST-A.4.10" || lowerId.includes("repeatability")) {
-    return (
-      <RepeatabilityTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
-  }
-
-  // 3. Eccentricity Test (TEST-A.4.7 / eccentricity_test)
-  if (normalizedId === "TEST-A.4.7" || lowerId.includes("eccentricity")) {
-    return (
-      <EccentricityTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
-  }
-
-  // 4. Tare Test (TEST-A.4.6.1 / tare_test)
-  if (normalizedId === "TEST-A.4.6.1" || lowerId.includes("tare")) {
-    return (
-      <TareTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
-  }
-
-  // 5. Zero Setting & Accuracy Tests (TEST-A.4.2.1, TEST-A.4.2.3, TEST-A.4.11.2)
+  // ── 1. Zero Setting & Accuracy Tests (TEST-A.4.2.1, TEST-A.4.2.3, TEST-A.4.11.2) ──
   if (
     normalizedId === "TEST-A.4.2.1" ||
     normalizedId === "TEST-A.4.2.3" ||
-    normalizedId === "TEST-A.4.11.2" ||
-    lowerId.includes("zero")
+    normalizedId === "TEST-A.4.11.2"
   ) {
-    return (
-      <ZeroSettingTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
+    return <ZeroSettingTestForm {...commonProps} />;
   }
 
-  // 6. Temperature Tests (TEST-A.5.3.1, TEST-A.5.3.2)
+  // ── 2. Weighing Performance Test (TEST-A.4.4.1) ───────────────────────────────
+  if (normalizedId === "TEST-A.4.4.1") {
+    return <WeighingTestForm {...commonProps} />;
+  }
+
+  // ── 3. Tare Test (TEST-A.4.6.1) ───────────────────────────────────────────────
+  if (normalizedId === "TEST-A.4.6.1") {
+    return <TareTestForm {...commonProps} />;
+  }
+
+  // ── 4. Eccentricity Test (TEST-A.4.7) ────────────────────────────────────────
+  if (normalizedId === "TEST-A.4.7") {
+    return <EccentricityTestForm {...commonProps} />;
+  }
+
+  // ── 5. Repeatability Test (TEST-A.4.10) ──────────────────────────────────────
+  if (normalizedId === "TEST-A.4.10") {
+    return <RepeatabilityTestForm {...commonProps} />;
+  }
+
+  // ── 6. Stability of Equilibrium (TEST-A.4.12) ────────────────────────────────
+  // IMPORTANT: This must come BEFORE the broad EMC/keyword block below because
+  // the test name "Stability of Equilibrium" contains the word "equilibrium",
+  // which was previously matched by the EMCElectricalTestForm catch-all.
+  if (normalizedId === "TEST-A.4.12") {
+    return <WeighingTestForm {...commonProps} />;
+  }
+
+  // ── 7. Temperature Tests (TEST-A.5.3.1, TEST-A.5.3.2) ───────────────────────
   if (
     normalizedId === "TEST-A.5.3.1" ||
-    normalizedId === "TEST-A.5.3.2" ||
-    lowerId.includes("temp")
+    normalizedId === "TEST-A.5.3.2"
   ) {
-    return (
-      <TemperatureTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
+    return <TemperatureTestForm {...commonProps} />;
   }
 
-  // 7. Voltage Variations & Warm-up (TEST-A.5.4, TEST-A.5.2)
+  // ── 8. Voltage / Warm-up Tests (TEST-A.5.4, TEST-A.5.2) ─────────────────────
   if (
     normalizedId === "TEST-A.5.4" ||
-    normalizedId === "TEST-A.5.2" ||
+    normalizedId === "TEST-A.5.2"
+  ) {
+    return <VoltageVariationTestForm {...commonProps} />;
+  }
+
+  // ── 9. EMC / Electrical Tests (Annex B, Annex C) ─────────────────────────────
+  if (
+    normalizedId.startsWith("TEST-B") ||
+    normalizedId.startsWith("TEST-C")
+  ) {
+    return <EMCElectricalTestForm {...commonProps} />;
+  }
+
+  // ── 10. Keyword-based fallbacks (for legacy / custom test IDs) ───────────────
+  // NOTE: Keyword matching runs AFTER all explicit ID checks above to prevent
+  // false positives on test IDs that contain common words.
+
+  if (lowerId.includes("weighing_test") || lowerId === "weighing") {
+    return <WeighingTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("repeatability")) {
+    return <RepeatabilityTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("eccentricity")) {
+    return <EccentricityTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("tare")) {
+    return <TareTestForm {...commonProps} />;
+  }
+
+  // "zero" includes stability-of-zero and range-of-zero tests
+  if (lowerId.includes("zero")) {
+    return <ZeroSettingTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("temp")) {
+    return <TemperatureTestForm {...commonProps} />;
+  }
+
+  if (
     lowerId.includes("voltage") ||
     lowerId.includes("warmup") ||
     lowerId.includes("warm-up")
   ) {
-    return (
-      <VoltageVariationTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
+    return <VoltageVariationTestForm {...commonProps} />;
   }
 
-  // 8. EMC / Electrical Tests (TEST-B.2, TEST-B.3.1, TEST-B.3.2, TEST-B.3.4, TEST-B.3.5, TEST-B.3.6, TEST-B.4, TEST-C.3.3, etc.)
   if (
-    normalizedId.startsWith("TEST-B") ||
-    normalizedId.startsWith("TEST-C") ||
     lowerId.includes("damp") ||
     lowerId.includes("burst") ||
     lowerId.includes("esd") ||
@@ -153,28 +171,12 @@ export function TestFormDispatcher({
     lowerId.includes("endurance") ||
     lowerId.includes("discrimination") ||
     lowerId.includes("sensitivity") ||
-    lowerId.includes("creep") ||
-    lowerId.includes("equilibrium")
+    lowerId.includes("creep")
   ) {
-    return (
-      <EMCElectricalTestForm
-        testId={testId}
-        testName={testName}
-        observations={observations}
-        onObservationsChange={onObservationsChange}
-        disabled={disabled}
-      />
-    );
+    return <EMCElectricalTestForm {...commonProps} />;
   }
 
-  // 9. Generic Fallback
-  return (
-    <GenericObservationForm
-      testId={testId}
-      testName={testName}
-      observations={observations}
-      onObservationsChange={onObservationsChange}
-      disabled={disabled}
-    />
-  );
+  // ── 11. Safe Fallback — Generic Observation Form ──────────────────────────────
+  // Always renders something valid. Never returns null / undefined.
+  return <GenericObservationForm {...commonProps} />;
 }

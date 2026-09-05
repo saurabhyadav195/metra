@@ -26,7 +26,8 @@ class EvaluationService:
 
     def _build_context_from_instrument(self, inst: dict) -> EvaluationContext:
         """Converts instrument database record into EvaluationContext."""
-        capacity = float(inst.get("capacity") or inst.get("max_capacity") or 100.0)
+        capacity_val = inst.get("max_capacity") if inst.get("max_capacity") is not None else (inst.get("capacity") if inst.get("capacity") is not None else inst.get("Max"))
+        capacity = float(capacity_val if capacity_val is not None else 100.0)
         e = float(inst.get("verification_scale_interval_e") or inst.get("verification_scale_interval") or inst.get("e_resolution") or 0.05)
         d = float(inst.get("scale_interval_d") or inst.get("actual_scale_interval") or inst.get("d_resolution") or e)
 
@@ -430,7 +431,10 @@ class EvaluationService:
         PASS if |Ec| <= MPE for each load step.
         MPE determined by MPE_INIT rule (Table 6).
         """
-        load_steps = observations.get("load_steps") or observations.get("readings") or []
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        load_steps = observations.get("load_steps") or observations.get("readings") or observations.get("rows") or []
         e = context.e_resolution
         verification_type = observations.get("verification_type", "initial")
 
@@ -441,8 +445,8 @@ class EvaluationService:
         norm_steps = []
         for step in load_steps:
             if isinstance(step, dict):
-                L_val = float(step.get("L") if step.get("L") is not None else step.get("load", 0.0))
-                I_val = float(step.get("I") if step.get("I") is not None else step.get("indication", 0.0))
+                L_val = float(step.get("L") if step.get("L") is not None else (step.get("load") if step.get("load") is not None else step.get("applied_load", 0.0)))
+                I_val = float(step.get("I") if step.get("I") is not None else (step.get("indication") if step.get("indication") is not None else step.get("indicated_value", 0.0)))
                 dL_val = float(step.get("dL", 0.0))
                 norm_steps.append({"L": L_val, "I": I_val, "dL": dL_val})
 
@@ -604,7 +608,10 @@ class EvaluationService:
             Ec = E - E0
         PASS if |Ec| <= MPE for applied test load (ECCENTRICITY_LIMIT §3.6.2).
         """
-        positions = observations.get("positions", [])
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        positions = observations.get("positions") or observations.get("load_steps") or observations.get("readings") or []
         e = context.e_resolution
         E0 = float(observations.get("E0", 0.0))
 
@@ -616,8 +623,8 @@ class EvaluationService:
 
         for pos in positions:
             position_id = pos.get("position", "unknown")
-            L = float(pos.get("L") if pos.get("L") is not None else pos.get("load", 0.0))
-            I = float(pos.get("I") if pos.get("I") is not None else pos.get("indication", 0.0))
+            L = float(pos.get("L") if pos.get("L") is not None else (pos.get("load") if pos.get("load") is not None else pos.get("applied_load", 0.0)))
+            I = float(pos.get("I") if pos.get("I") is not None else (pos.get("indication") if pos.get("indication") is not None else pos.get("indicated_value", 0.0)))
             dL = float(pos.get("dL", 0.0))
 
             # CALC_ERROR_CHANGEOVER
@@ -721,6 +728,74 @@ class EvaluationService:
             ]
         }
 
+    def _calculate_zero_setting_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Zero setting test calculator (TEST-A.4.2.1 & TEST-A.4.2.3) — OIML R 76-1 §A.4.2 & §4.5.1
+        Extracts Max capacity (e.g. 300 kg) and e from registered instrument context.
+        Calculates zero-setting range compliance and zero accuracy.
+        """
+        Max = context.max_capacity
+        e = context.e_resolution
+        zero_type = observations.get("zero_setting_type", "initial")
+
+        pos_pct = float(observations.get("positive_range") if observations.get("positive_range") is not None else observations.get("positive_limit_percent", 4.0))
+        neg_pct = float(observations.get("negative_range") if observations.get("negative_range") is not None else observations.get("negative_limit_percent", 1.0))
+        dL = float(observations.get("dL") if observations.get("dL") is not None else observations.get("additional_weight_changeover", 0.02))
+        initial_ind = float(observations.get("initial_indication") if observations.get("initial_indication") is not None else observations.get("initial_no_load_indication", 0.0))
+
+        total_pct = pos_pct + neg_pct
+        max_allowed_pct = 20.0 if zero_type == "initial" else 4.0
+
+        pos_kg = (pos_pct / 100.0) * Max
+        neg_kg = (neg_pct / 100.0) * Max
+        max_allowed_kg = (max_allowed_pct / 100.0) * Max
+
+        passed = (total_pct <= max_allowed_pct) or (pos_pct <= max_allowed_pct and neg_pct <= max_allowed_pct)
+
+        # Zero accuracy error if dL is provided
+        E0 = round((initial_ind + 0.5 * e - dL) if dL > 0 else initial_ind, 6)
+        accuracy_passed = abs(E0) <= 0.25 * e
+
+        overall_pass = passed and accuracy_passed
+
+        return {
+            "status": "PASS" if overall_pass else "FAIL",
+            "Max": Max,
+            "e": e,
+            "zero_setting_type": zero_type,
+            "positive_range_percent": pos_pct,
+            "negative_range_percent": neg_pct,
+            "total_range_percent": round(total_pct, 2),
+            "positive_range_kg": round(pos_kg, 4),
+            "negative_range_kg": round(neg_kg, 4),
+            "max_allowed_percent": max_allowed_pct,
+            "max_allowed_kg": round(max_allowed_kg, 4),
+            "E0": E0,
+            "rows": [
+                {
+                    "L": 0,
+                    "I": initial_ind,
+                    "dL": dL,
+                    "P": round(initial_ind + (0.5 * e if dL > 0 else 0.0) - dL, 6),
+                    "E": E0,
+                    "E0": E0,
+                    "Ec": E0,
+                    "mpe_value": round(max_allowed_kg, 4),
+                    "mpe_e": round(max_allowed_pct, 1),
+                    "result": "PASS" if overall_pass else "FAIL"
+                }
+            ],
+            "rule_references": [
+                {"rule_id": "VAL_ZERO_SETTING_RANGE", "section": "4.5.1 & A.4.2.1", "page": 48, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "ZERO_SETTING_ACCURACY", "section": "A.4.2.3", "page": 87, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+            ]
+        }
+
     async def calculate_test(
         self,
         evaluation_id: str,
@@ -751,6 +826,18 @@ class EvaluationService:
 
         test_def = self.loader.get_test(test_id) or {}
 
+        # Development-only engine input log
+        print(
+            f"[OIML ENGINE INPUT]\n"
+            f"test_code: {test_id}\n"
+            f"instrument_id: {context.instrument_id}\n"
+            f"Max: {context.max_capacity}\n"
+            f"Min: {context.min_capacity}\n"
+            f"e: {context.e_resolution}\n"
+            f"d: {context.d_resolution}\n"
+            f"normalized observations: {observations}"
+        )
+
         # ── Specialized calculators (backed by OIML rule data) ─────────────
         specialized_result = None
 
@@ -764,6 +851,8 @@ class EvaluationService:
             specialized_result = self._calculate_discrimination_test(context, observations)
         elif test_id in ("TEST-A.4.6.1", "tare_test"):
             specialized_result = self._calculate_weighing_test(context, observations, test_def)
+        elif test_id in ("TEST-A.4.2.1", "TEST-A.4.2.3", "zero_setting_test"):
+            specialized_result = self._calculate_zero_setting_test(context, observations, test_def)
 
         if specialized_result:
             calc_status = specialized_result.get("status", "ERROR")
@@ -960,10 +1049,15 @@ class EvaluationService:
             "finalized_at": datetime.utcnow().isoformat()
         }
 
-        self._safe_update("evaluations", {
+        eval_update = {
             "status": overall_status,
             "overall_result": overall_data,
             "completed_at": datetime.utcnow().isoformat()
-        }, "id", evaluation_id)
+        }
+        if caller.role in ("owner", "admin"):
+            eval_update["approved_by"] = caller.user_id
+            eval_update["approved_at"] = datetime.utcnow().isoformat()
+
+        self._safe_update("evaluations", eval_update, "id", evaluation_id)
 
         return await self.get_evaluation_detail(evaluation_id, caller)

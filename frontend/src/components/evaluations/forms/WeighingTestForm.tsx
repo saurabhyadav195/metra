@@ -25,12 +25,19 @@ export interface ReadingRow {
 }
 
 const DEMO_READINGS: ReadingRow[] = [
-  { load: 0, indication: 0, dL: 0 },
-  { load: 50, indication: 50.0, dL: 0 },
-  { load: 100, indication: 100.1, dL: 0 },
-  { load: 200, indication: 199.9, dL: 0 },
-  { load: 250, indication: 250.1, dL: 0 },
-  { load: 300, indication: 300.0, dL: 0 },
+  { load: 0.02, indication: 0.02, dL: 0 },
+  { load: 0.04, indication: 0.04, dL: 0 },
+  { load: 0.5, indication: 0.5, dL: 0 },
+  { load: 1.0, indication: 1.0, dL: 0 },
+  { load: 2.0, indication: 2.0, dL: 0 },
+  { load: 3.0, indication: 3.0, dL: 0 },
+  { load: 4.0, indication: 4.0, dL: 0 },
+  { load: 5.0, indication: 5.0, dL: 0 },
+  { load: 5.99, indication: 5.99, dL: 0 },
+  { load: 8.0, indication: 8.0, dL: 0 },
+  { load: 10.0, indication: 10.0, dL: 0 },
+  { load: 12.5, indication: 12.5, dL: 0 },
+  { load: 15.0, indication: 15.0, dL: 0 },
 ];
 
 export function WeighingTestForm({
@@ -51,7 +58,15 @@ export function WeighingTestForm({
   useEffect(() => {
     onObservationsChange({
       readings,
-      load_steps: readings.map((r) => ({ L: r.load, I: r.indication, dL: r.dL || 0 })),
+      load_steps: readings.map((r) => ({
+        L: Number(r.load),
+        I: Number(r.indication),
+        load: Number(r.load),
+        indication: Number(r.indication),
+        applied_load: Number(r.load),
+        indicated_value: Number(r.indication),
+        dL: Number(r.dL || 0),
+      })),
       verification_type: verificationType,
     });
   }, [readings, verificationType]);

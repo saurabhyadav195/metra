@@ -121,15 +121,17 @@ export function StatusBadge({ type = "evaluation", status, className, size = "de
       badgeClassName = config.className;
     }
   } else if (type === "test") {
-    const config = TEST_STATUS_CONFIG[status as TestStatus];
+    const normKey = String(status || "").toUpperCase() as TestStatus;
+    const config = TEST_STATUS_CONFIG[normKey] || TEST_STATUS_CONFIG[status as TestStatus];
     if (config) {
       label = config.label;
       badgeClassName = config.className;
     }
   } else {
-    const config = INSTRUMENT_STATUS_CONFIG[status as InstrumentStatus];
+    const normKey = String(status || "").toLowerCase() as InstrumentStatus;
+    const config = INSTRUMENT_STATUS_CONFIG[normKey] || INSTRUMENT_STATUS_CONFIG[status as InstrumentStatus];
     if (config) {
-      label = INSTRUMENT_STATUS_LABELS[status as InstrumentStatus] ?? status;
+      label = INSTRUMENT_STATUS_LABELS[status as InstrumentStatus] ?? INSTRUMENT_STATUS_LABELS[normKey] ?? status;
       badgeClassName = config.className;
     }
   }
@@ -152,19 +154,48 @@ export function StatusBadge({ type = "evaluation", status, className, size = "de
 
 /* ── Result badge (PASS / FAIL / REVIEW) ─────────── */
 
+const RESULT_CONFIG: Record<
+  string,
+  { label: string; className: string }
+> = {
+  PASS: { label: "Pass", className: "status-pass border" },
+  PASSED: { label: "Pass", className: "status-pass border" },
+  FAIL: { label: "Fail", className: "status-fail border" },
+  FAILED: { label: "Fail", className: "status-fail border" },
+  REVIEW: { label: "Requires Review", className: "status-review border" },
+  REQUIRES_REVIEW: { label: "Requires Review", className: "status-review border" },
+  MANUAL_REVIEW: { label: "Manual Review", className: "status-review border" },
+  IN_PROGRESS: {
+    label: "In Progress",
+    className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 border font-medium",
+  },
+  NOT_STARTED: {
+    label: "Not Started",
+    className: "bg-muted text-muted-foreground border-border font-medium",
+  },
+  INCOMPLETE: {
+    label: "Incomplete",
+    className: "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20 border font-medium",
+  },
+  COMPLETED: { label: "Completed", className: "status-pass border" },
+  NOT_APPLICABLE: {
+    label: "N/A",
+    className: "bg-muted text-muted-foreground border-border font-medium",
+  },
+};
+
 interface ResultBadgeProps {
-  result: "PASS" | "FAIL" | "REVIEW" | "REQUIRES_REVIEW";
+  result: "PASS" | "FAIL" | "REVIEW" | "REQUIRES_REVIEW" | string;
   size?: "sm" | "default" | "lg";
   className?: string;
 }
 
 export function ResultBadge({ result, size = "default", className }: ResultBadgeProps) {
-  const config = {
-    PASS: { label: "Pass", className: "status-pass border" },
-    FAIL: { label: "Fail", className: "status-fail border" },
-    REVIEW: { label: "Requires Review", className: "status-review border" },
-    REQUIRES_REVIEW: { label: "Requires Review", className: "status-review border" },
-  }[result];
+  const normKey = String(result || "PASS").toUpperCase().trim();
+  const config = RESULT_CONFIG[normKey] ?? RESULT_CONFIG[result] ?? {
+    label: String(result || "Pass"),
+    className: "bg-muted text-muted-foreground border-border font-medium",
+  };
 
   return (
     <span
@@ -181,3 +212,4 @@ export function ResultBadge({ result, size = "default", className }: ResultBadge
     </span>
   );
 }
+

@@ -3,7 +3,7 @@ METRA — app/engine/validator.py
 Validates observation inputs and instrument parameters against OIML R-76 metrological rules.
 """
 
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from app.engine.models import EvaluationContext, ValidationResult
 from app.engine.rule_loader import get_rule_loader
 
@@ -93,17 +93,42 @@ class InputValidator:
 
         return results
 
-    def validate_test_observations(self, test: Dict[str, Any], observations: Dict[str, Any]) -> List[ValidationResult]:
-        """Validates observations against test required_inputs schema."""
+    def validate_test_observations(
+        self,
+        test: Dict[str, Any],
+        observations: Dict[str, Any],
+        context: Optional[EvaluationContext] = None
+    ) -> List[ValidationResult]:
+        """Validates observations and instrument context against test required_inputs schema."""
         results: List[ValidationResult] = []
         required_inputs = test.get("required_inputs", [])
+
+        # Build merged inputs: instrument context parameters + observation entries
+        merged_inputs: Dict[str, Any] = {}
+        if context:
+            merged_inputs.update({
+                "Max": context.max_capacity,
+                "max_capacity": context.max_capacity,
+                "Min": context.min_capacity,
+                "min_capacity": context.min_capacity,
+                "e": context.e_resolution,
+                "d": context.d_resolution,
+                "accuracy_class": context.accuracy_class,
+                "unit": context.unit,
+                "has_tare": context.has_tare,
+                "is_electronic": context.is_electronic,
+            })
+        if observations:
+            merged_inputs.update(observations)
 
         for req in required_inputs:
             param_name = req.get("name")
             param_type = req.get("type", "number")
 
-            if param_name not in observations or observations[param_name] is None:
-                # Check if it's optional or missing
+            if param_name not in merged_inputs or merged_inputs[param_name] is None:
+                # Check if optional or missing
+                if req.get("optional") is True or req.get("default") is not None:
+                    continue
                 results.append(ValidationResult(
                     rule_id="VAL_REQUIRED_INPUT_MISSING",
                     param_name=param_name,
@@ -112,7 +137,7 @@ class InputValidator:
                 ))
                 continue
 
-            val = observations[param_name]
+            val = merged_inputs[param_name]
 
             # Type checking
             if param_type == "number" and not isinstance(val, (int, float)):

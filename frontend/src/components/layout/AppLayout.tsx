@@ -1,32 +1,30 @@
 /**
  * METRA — components/layout/AppLayout.tsx
- * Main application shell with persistent sidebar (desktop),
- * collapsible sidebar (tablet), and mobile navigation drawer.
+ * Main application shell with a full-width top navbar.
+ * The permanent left sidebar has been removed.
+ * Navigation is inline in the header on desktop; a Sheet drawer on mobile.
  */
 
 import { useState, type ReactNode } from "react";
-import { useNavigate } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Menu01Icon,
   Logout01Icon,
-  UserCircleIcon,
+  DashboardSquare01Icon,
+  ClipboardCheckIcon,
+  ScaleIcon,
+  FileTextIcon,
+  UserGroupIcon,
+  Settings01Icon,
 } from "@hugeicons/core-free-icons";
 import { useAuth } from "@/hooks/use-auth";
 import { cn } from "@/lib/utils";
-import { Sidebar } from "./Sidebar";
 import { MobileNav } from "./MobileNav";
 import type { UserRole } from "@/types/auth";
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+
+/* ── Role labels & badge colours ──────────────────── */
 
 const ROLE_LABEL: Record<UserRole, string> = {
   owner: "Owner",
@@ -34,11 +32,55 @@ const ROLE_LABEL: Record<UserRole, string> = {
   engineer: "Engineer",
 };
 
-const ROLE_COLOR: Record<UserRole, string> = {
-  owner: "bg-primary/10 text-primary border-primary/20",
-  admin: "bg-info-bg text-info-text border-info-border",
-  engineer: "bg-secondary text-secondary-foreground border-border",
+/* ── Navigation items per role ────────────────────── */
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ComponentProps<typeof HugeiconsIcon>["icon"];
+}
+
+const NAV_ITEMS: Record<UserRole, NavItem[]> = {
+  engineer: [
+    { label: "Dashboard",      href: "/app/dashboard",    icon: DashboardSquare01Icon },
+    { label: "My Evaluations", href: "/app/evaluations",  icon: ClipboardCheckIcon   },
+    { label: "Instruments",    href: "/app/instruments",  icon: ScaleIcon            },
+    { label: "Reports",        href: "/app/reports",      icon: FileTextIcon         },
+  ],
+  admin: [
+    { label: "Dashboard",    href: "/app/dashboard",    icon: DashboardSquare01Icon },
+    { label: "Evaluations",  href: "/app/evaluations",  icon: ClipboardCheckIcon   },
+    { label: "Instruments",  href: "/app/instruments",  icon: ScaleIcon            },
+    { label: "Team",         href: "/app/team",         icon: UserGroupIcon        },
+    { label: "Reports",      href: "/app/reports",      icon: FileTextIcon         },
+  ],
+  owner: [
+    { label: "Dashboard",    href: "/app/dashboard",    icon: DashboardSquare01Icon },
+    { label: "Evaluations",  href: "/app/evaluations",  icon: ClipboardCheckIcon   },
+    { label: "Instruments",  href: "/app/instruments",  icon: ScaleIcon            },
+    { label: "Team",         href: "/app/team",         icon: UserGroupIcon        },
+    { label: "Reports",      href: "/app/reports",      icon: FileTextIcon         },
+    { label: "Settings",     href: "/app/settings",     icon: Settings01Icon       },
+  ],
 };
+
+/* ── NavLink active detection helper ──────────────── */
+
+/**
+ * For the Dashboard link we need exact matching so that sub-routes
+ * (e.g. /app/engineer/dashboard) don't cause two items to appear active.
+ */
+function isNavLinkActive(href: string, currentPath: string): boolean {
+  if (href === "/app/dashboard") {
+    return (
+      currentPath === "/app/dashboard" ||
+      currentPath.includes("/dashboard")
+    );
+  }
+  return currentPath.startsWith(href);
+}
+
+/* ── AppLayout ─────────────────────────────────────── */
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -49,7 +91,8 @@ export function AppLayout({ children }: AppLayoutProps) {
   const navigate = useNavigate();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const role = profile?.role ?? "engineer";
+  const role: UserRole = profile?.role ?? "engineer";
+  const navItems = NAV_ITEMS[role];
 
   const handleSignOut = async () => {
     await signOut();
@@ -58,111 +101,126 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      {/* ── Top Header ─────────────────────────────── */}
-      <header className="sticky top-0 z-40 flex h-12 shrink-0 items-center justify-between border-b border-border/80 bg-card px-4 shadow-xs">
-        {/* Left: Mobile menu + Logo */}
-        <div className="flex items-center gap-3">
-          {/* Hamburger (mobile only) */}
-          <button
-            type="button"
-            onClick={() => setMobileNavOpen(true)}
-            className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
-            aria-label="Open navigation menu"
-            aria-expanded={mobileNavOpen}
-            aria-controls="mobile-nav"
-          >
-            <HugeiconsIcon icon={Menu01Icon} strokeWidth={2} className="size-4" />
-          </button>
+      {/* ── Top Navbar ───────────────────────────────── */}
+      <header
+        className="sticky top-0 z-40 w-full shrink-0 bg-primary shadow-sm"
+        role="banner"
+      >
+        <div className="flex h-14 items-center gap-0 px-4 lg:px-6">
 
-          {/* Logo */}
-          <div className="flex items-center gap-2.5">
-            <span className="text-sm font-bold tracking-tight text-foreground bg-primary/10 text-primary px-2 py-0.5 rounded border border-primary/20 font-mono">
-              METRA
-            </span>
-            <span className="hidden text-xs text-muted-foreground font-medium lg:block">
-              Metrology Evaluation &amp; Test Report Automation
-            </span>
+          {/* ── Left: Mobile hamburger + Branding ────── */}
+          <div className="flex items-center gap-3 shrink-0">
+            {/* Hamburger — mobile only */}
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="flex size-8 items-center justify-center rounded-md text-primary-foreground/75 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/50 md:hidden"
+              aria-label="Open navigation menu"
+              aria-expanded={mobileNavOpen}
+              aria-controls="mobile-nav"
+            >
+              <HugeiconsIcon icon={Menu01Icon} strokeWidth={2} className="size-5" />
+            </button>
+
+            {/* METRA wordmark */}
+            <div className="flex flex-col leading-none">
+              <span className="text-sm font-bold tracking-widest text-primary-foreground font-mono uppercase">
+                METRA
+              </span>
+              <span className="hidden text-[9px] font-medium text-primary-foreground/60 tracking-wide lg:block">
+                Metrology Evaluation &amp; Test Report Automation
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Right: User Dropdown Menu */}
-        <div className="flex items-center gap-2">
-          {profile && (
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex h-8 items-center gap-2 rounded-md px-2 text-xs hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer">
-                <div className="flex size-6 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-[10px]">
-                  {profile.full_name?.charAt(0).toUpperCase() || "U"}
+          {/* ── Divider ──────────────────────────────── */}
+          <div className="mx-4 hidden h-6 w-px bg-primary-foreground/20 md:block" aria-hidden="true" />
+
+          {/* ── Centre: Inline navigation (desktop) ──── */}
+          <nav
+            className="hidden flex-1 items-center gap-0.5 md:flex"
+            aria-label="Main navigation"
+          >
+            {navItems.map((item) => (
+              <NavLink
+                key={item.href}
+                to={item.href}
+                className={({ isActive }) => {
+                  // Also treat sub-pages as active for the parent nav item
+                  // (e.g. /app/evaluations/abc should highlight "Evaluations")
+                  return cn(
+                    "flex h-8 items-center gap-2 rounded-md px-3 text-[13px] font-medium transition-colors duration-150",
+                    isActive
+                      ? "bg-primary-foreground/15 text-primary-foreground font-semibold"
+                      : "text-primary-foreground/75 hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                  );
+                }}
+              >
+                {({ isActive }) => (
+                  <>
+                    <HugeiconsIcon
+                      icon={item.icon}
+                      strokeWidth={isActive ? 2 : 1.5}
+                      className="size-3.5 shrink-0"
+                    />
+                    <span>{item.label}</span>
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+
+          {/* ── Right: User identity + Sign out ──────── */}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
+            {profile && (
+              <>
+                {/* User info — static text, NOT a nav button */}
+                <div className="hidden flex-col items-end leading-none sm:flex">
+                  <span className="text-[13px] font-semibold text-primary-foreground">
+                    {profile.full_name}
+                  </span>
+                  <span className="mt-0.5 text-[10px] font-semibold uppercase tracking-widest text-primary-foreground/60">
+                    {ROLE_LABEL[role]}
+                  </span>
                 </div>
-                <span className="hidden font-medium text-foreground sm:inline">
-                  {profile.full_name}
-                </span>
-                <span
-                  className={cn(
-                    "hidden rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider sm:inline-block",
-                    ROLE_COLOR[role]
-                  )}
+
+                {/* Avatar circle */}
+                <div
+                  className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary-foreground/15 text-primary-foreground font-bold text-[11px] border border-primary-foreground/25"
+                  aria-hidden="true"
                 >
-                  {ROLE_LABEL[role]}
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 bg-popover text-popover-foreground border-border shadow-md z-50">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-xs font-semibold text-foreground">{profile.full_name}</p>
-                    <p className="text-[11px] text-muted-foreground truncate">{profile.email}</p>
-                    <div className="pt-1">
-                      <span className={cn("inline-block rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider", ROLE_COLOR[role])}>
-                        {ROLE_LABEL[role]} Role
-                      </span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => navigate("/app/dashboard")}
-                  className="cursor-pointer"
-                >
-                  <HugeiconsIcon icon={UserCircleIcon} strokeWidth={1.5} className="mr-2 size-3.5" />
-                  <span>Dashboard</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  variant="destructive"
-                  className="cursor-pointer text-destructive focus:bg-destructive/10"
-                >
-                  <HugeiconsIcon icon={Logout01Icon} strokeWidth={1.5} className="mr-2 size-3.5" />
-                  <span>Sign out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+                  {profile.full_name?.charAt(0).toUpperCase() ?? "U"}
+                </div>
+              </>
+            )}
+
+            {/* Sign out — always visible */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="h-8 gap-1.5 rounded-md px-3 text-[13px] font-medium text-primary-foreground/75 hover:bg-primary-foreground/10 hover:text-primary-foreground transition-colors duration-150 focus-visible:ring-primary-foreground/50"
+              aria-label="Sign out of METRA"
+            >
+              <HugeiconsIcon icon={Logout01Icon} strokeWidth={1.5} className="size-4 shrink-0" />
+              <span className="hidden sm:inline">Sign out</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* ── Body ────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
-        {/* Desktop / Tablet Sidebar */}
-        <aside
-          className="hidden w-56 shrink-0 flex-col border-r border-border bg-card md:flex"
-          aria-label="Application sidebar"
-        >
-          <Sidebar role={role} />
-        </aside>
+      {/* ── Page content — full width, no sidebar ────── */}
+      <main
+        id="main-content"
+        className="flex-1 overflow-y-auto"
+        tabIndex={-1}
+      >
+        <div className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6 lg:px-8">
+          {children}
+        </div>
+      </main>
 
-        {/* Page content */}
-        <main
-          id="main-content"
-          className="flex-1 overflow-y-auto"
-          tabIndex={-1}
-        >
-          <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-            {children}
-          </div>
-        </main>
-      </div>
-
-      {/* Mobile Navigation Drawer */}
+      {/* ── Mobile Navigation Drawer ─────────────────── */}
       <MobileNav
         isOpen={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}

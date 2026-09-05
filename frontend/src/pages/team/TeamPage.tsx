@@ -51,17 +51,17 @@ export default function TeamPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm" role="table">
               <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                <tr className="border-b border-border bg-muted/70">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Name
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Email
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Role
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Status
                   </th>
                 </tr>

@@ -61,8 +61,9 @@ export function EvaluationStatusBadge({
   status,
   className,
 }: EvaluationStatusBadgeProps) {
-  const config = STATUS_CONFIG[status] ?? {
-    label: status,
+  const normKey = String(status || "").toUpperCase().trim();
+  const config = STATUS_CONFIG[normKey] ?? STATUS_CONFIG[status] ?? {
+    label: String(status || "UNKNOWN"),
     className: "bg-secondary text-muted-foreground border border-border",
   };
 
