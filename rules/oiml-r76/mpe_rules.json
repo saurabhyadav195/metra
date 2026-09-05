@@ -11,7 +11,7 @@
         "page": 30,
         "table": "Table 6"
       },
-      "classes": {,
+      "classes": {
         "I": [
           {
             "min_load_e": 0,
@@ -120,7 +120,7 @@
         "page": 31
       },
       "verification_status": "VERIFIED"
-    }
+    },
     {
       "rule_id": "ECCENTRICITY_LIMIT",
       "name": "Permissible error for eccentric loading",
@@ -252,17 +252,6 @@
         "page": 115
       },
       "verification_status": "VERIFIED"
-    }
-  ]
-}e to cable temperature",
-      "rule": "Delta_span(Delta_T) <= (1/3) * p_i * mpe.",
-      "source": {
-        "standard": "OIML R 76-1",
-        "edition": "2006 (E)",
-        "section": "C.3.3.2.5",
-        "page": 115
-      },
-      "verification_status": "REQUIRES_MANUAL_VERIFICATION"
     }
   ]
 }
