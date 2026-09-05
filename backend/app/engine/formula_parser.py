@@ -36,7 +36,7 @@ ALLOWED_NODES = {
     ast.UAdd,
     ast.Name,
     ast.Constant,
-    ast.Num,  # Python <= 3.7 compatibility
+    ast.Constant,  # Python <= 3.7 compatibility
     ast.Call,
     ast.Load,
     ast.List,
