@@ -172,7 +172,7 @@
           ]
         },
         {
-          "field": "Max_kg",
+          "field": "Max",
           "operator": "<=",
           "value": 100
         }

@@ -428,6 +428,36 @@
         "page": 115
       },
       "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "CALC_SENSE_SPAN_VARIATION",
+      "name": "Span variation due to sense cable temperature change",
+      "formula_human": "Delta_span = (Delta_R_Temp / R_cable) * 100",
+      "formula_expression": "(Delta_R_Temp / R_cable)",
+      "inputs": [
+        {
+          "symbol": "Delta_R_Temp",
+          "name": "Resistance variation",
+          "unit": "ohm"
+        },
+        {
+          "symbol": "R_cable",
+          "name": "Wire resistance",
+          "unit": "ohm"
+        }
+      ],
+      "output": {
+        "symbol": "Delta_span",
+        "name": "Span variation",
+        "unit": "dimensionless"
+      },
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "C.3.3.2.5",
+        "page": 115
+      },
+      "verification_status": "VERIFIED"
     }
   ]
 }

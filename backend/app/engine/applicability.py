@@ -54,36 +54,67 @@ class ApplicabilityEngine:
             return (ApplicabilityStatus.APPLICABLE, "Applies to all instruments")
 
         reasons = []
-        is_applicable = True
+        valid_class_symbols = {"I", "II", "III", "IIII"}
 
+        # 1. PRE-CHECK: Handle accuracy class logic (supports "class_III" and "III" formats)
+        allowed_classes = []
         for tag in app_tags:
-            if tag == "all_instruments":
-                continue
+            if tag.startswith("class_"):
+                allowed_classes.append(tag.replace("class_", "").upper())
+            elif tag.upper() in valid_class_symbols:
+                allowed_classes.append(tag.upper())
+
+        if allowed_classes:
+            if context.accuracy_class.upper() not in allowed_classes:
+                return (ApplicabilityStatus.NOT_APPLICABLE, f"Test is restricted to Class(es) {', '.join(allowed_classes)}")
+            reasons.append(f"Class {context.accuracy_class.upper()} instrument matches class requirements")
+
+        # 2. MAIN LOOP: Process the remaining non-class tags
+        for tag in app_tags:
+            if tag == "all_instruments" or tag.startswith("class_") or tag.upper() in valid_class_symbols:
+                continue  # Already handled in Pre-Check
             elif tag == "instruments_with_tare":
                 if not context.has_tare:
                     return (ApplicabilityStatus.NOT_APPLICABLE, "Instrument does not feature a tare device")
                 reasons.append("Tare device present")
-            elif tag == "electronic_instruments":
+            elif tag in ("electronic_instruments", "electronic_instruments_with_cables"):
                 if not context.is_electronic:
                     return (ApplicabilityStatus.NOT_APPLICABLE, "Non-electronic instrument")
                 reasons.append("Electronic instrument")
+            elif tag == "ac_mains_electronic_instruments":
+                if not context.is_electronic or getattr(context, 'power_source', 'mains') == "battery":
+                    return (ApplicabilityStatus.NOT_APPLICABLE, "Not an AC mains electronic instrument")
+                reasons.append("AC mains electronic instrument")
             elif tag == "battery_powered_instruments":
-                if context.power_source not in ("battery", "mains_and_battery"):
+                if getattr(context, 'power_source', '') not in ("battery", "mains_and_battery"):
                     return (ApplicabilityStatus.NOT_APPLICABLE, "Instrument is not battery powered")
                 reasons.append("Battery powered instrument")
-            elif tag.startswith("class_"):
-                target_cls = tag.replace("class_", "").upper()
-                if context.accuracy_class.upper() != target_cls:
-                    return (ApplicabilityStatus.NOT_APPLICABLE, f"Test is restricted to Class {target_cls}")
-                reasons.append(f"Class {target_cls} instrument")
             elif tag == "multi_interval":
-                if context.instrument_type != "multi_interval" and not context.multi_range:
+                if getattr(context, 'instrument_type', '') != "multi_interval" and not getattr(context, 'multi_range', False):
                     return (ApplicabilityStatus.NOT_APPLICABLE, "Instrument is single interval")
                 reasons.append("Multi-interval / multi-range instrument")
-            elif tag == "non_self_indicating":
-                if context.instrument_type != "non_self_indicating":
+            elif tag in ("non_self_indicating", "non_self_indicating_instruments"):
+                if getattr(context, 'instrument_type', '') != "non_self_indicating":
                     return (ApplicabilityStatus.NOT_APPLICABLE, "Instrument is self-indicating")
                 reasons.append("Non-self-indicating instrument")
+            elif tag == "digital_instruments_d_ge_5mg":
+                if getattr(context, 'd_resolution', 0) < 0.005:
+                    return (ApplicabilityStatus.NOT_APPLICABLE, "d is less than 5 mg")
+                reasons.append("Digital instrument with d >= 5mg")
+            elif tag == "Max_le_100kg":
+                if getattr(context, 'max_capacity', 0) > 100:
+                    return (ApplicabilityStatus.NOT_APPLICABLE, "Max capacity exceeds 100 kg")
+                reasons.append("Max capacity <= 100 kg")
+            elif tag == "indicators_with_6_wire":
+                return (ApplicabilityStatus.NOT_APPLICABLE, "Not a 6-wire module test")
+            elif tag == "instruments_liable_to_be_tilted":
+                reasons.append("Instrument liable to be tilted")
+            elif tag in ("printers", "data_storage"):
+                reasons.append(f"Applicable for {tag}")
+            elif tag.startswith("electronic_instruments_except_class_I"):
+                if getattr(context, 'accuracy_class', '').upper() == "I":
+                    return (ApplicabilityStatus.NOT_APPLICABLE, "Exempt for Class I instruments")
+                reasons.append("Electronic instrument (Not Class I)")
             elif tag == "module_testing":
                 return (ApplicabilityStatus.MANUAL_REVIEW, "Module-level testing requires manual review")
             else:
@@ -96,8 +127,7 @@ class ApplicabilityEngine:
                         return (ApplicabilityStatus.NOT_APPLICABLE, f"Condition {tag} not met: {rule.get('description')}")
                     reasons.append(rule.get('description', tag))
                 else:
-                    # Unknown tag fallback to APPLICABLE with warning
-                    reasons.append(f"Applicability tag '{tag}' accepted")
+                    return (ApplicabilityStatus.NOT_APPLICABLE, f"Unrecognized tag in JSON: '{tag}'")
 
         reason_text = "; ".join(reasons) if reasons else "Applicable based on specification"
         return (ApplicabilityStatus.APPLICABLE, reason_text)

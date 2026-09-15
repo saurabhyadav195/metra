@@ -252,6 +252,18 @@
         "page": 115
       },
       "verification_status": "VERIFIED"
+    },
+    {
+      "rule_id": "DISCRIMINATION_CRITERIA",
+      "name": "Discrimination threshold requirement for digital indication",
+      "rule": "An additional load of 1.4 d placed gently on the load receptor shall cause an unambiguous change in indication.",
+      "source": {
+        "standard": "OIML R 76-1",
+        "edition": "2006 (E)",
+        "section": "3.8.2.2 & A.4.8.2",
+        "page": 32
+      },
+      "verification_status": "VERIFIED"
     }
   ]
 }

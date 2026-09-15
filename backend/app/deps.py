@@ -22,7 +22,7 @@ from app.config import settings
 security = HTTPBearer()
 
 
-@lru_cache
+
 def get_supabase_client() -> Client:
     """Return a cached Supabase admin client (service role key).
     This client bypasses RLS for profile lookups.
