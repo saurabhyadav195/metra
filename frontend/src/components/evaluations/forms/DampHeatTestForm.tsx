@@ -1,11 +1,14 @@
 /**
- * METRA — components/evaluations/forms/TemperatureTestForm.tsx
- * Temperature Influence / Span Temperature Coefficient Test (OIML R 76-1 §A.5.3)
+ * METRA — components/evaluations/forms/DampHeatTestForm.tsx
+ * Damp Heat, Steady State Test (OIML R 76-1 Annex B §B.2.2)
  *
- * Three temperature stages: Low, Reference, High
- * Each stage:
- *   - Header fields: Temperature (°C), Time
- *   - Weighing table: Applied Load (L) | Indication (I) | Changeover (ΔL)
+ * Three dynamic weighing grids:
+ *   1. Initial Reference (before conditioning)
+ *   2. Damp Heat Stage (during/immediately after conditioning)
+ *   3. Final Reference (after recovery)
+ *
+ * Each grid has header fields: Time, Temperature (°C), Relative Humidity (%)
+ * Columns per grid: Applied Load (L) | Indication (I) | Changeover Weight (ΔL)
  */
 
 import { useState, useEffect } from "react";
@@ -15,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export interface TemperatureTestFormProps {
+export interface DampHeatTestFormProps {
   testId: string;
   testName: string;
   observations: Record<string, any>;
@@ -29,9 +32,10 @@ interface LoadRow {
   dL: number;
 }
 
-interface TempStage {
-  temperature: number;
+interface GridData {
   time: string;
+  temperature: number;
+  humidity: number;
   readings: LoadRow[];
 }
 
@@ -39,56 +43,57 @@ const DEMO_READINGS: LoadRow[] = [
   { L: 0, I: 0, dL: 0 },
 ];
 
-function parseStage(raw: any, defaultTemp: number): TempStage {
+function parseGrid(raw: any, defaultTemp: number, defaultHumidity: number): GridData {
   if (raw && typeof raw === "object") {
     return {
-      temperature: Number(raw.temperature ?? defaultTemp),
       time: String(raw.time ?? ""),
+      temperature: Number(raw.temperature ?? defaultTemp),
+      humidity: Number(raw.humidity ?? defaultHumidity),
       readings: Array.isArray(raw.readings) && raw.readings.length > 0
         ? raw.readings.map((r: any) => ({ L: Number(r.L ?? 0), I: Number(r.I ?? 0), dL: Number(r.dL ?? 0) }))
         : DEMO_READINGS.map((r) => ({ ...r })),
     };
   }
-  return { temperature: defaultTemp, time: "", readings: DEMO_READINGS.map((r) => ({ ...r })) };
+  return { time: "", temperature: defaultTemp, humidity: defaultHumidity, readings: DEMO_READINGS.map((r) => ({ ...r })) };
 }
 
-function TempStagePanel({
+function WeighingGridPanel({
   label,
   colorClass,
-  stage,
+  data,
   onChange,
   disabled,
 }: {
   label: string;
   colorClass: string;
-  stage: TempStage;
-  onChange: (s: TempStage) => void;
+  data: GridData;
+  onChange: (d: GridData) => void;
   disabled: boolean;
 }) {
-  const handleFieldChange = (field: "temperature" | "time", val: string) => {
+  const handleHeaderChange = (field: "time" | "temperature" | "humidity", val: string) => {
     if (field === "time") {
-      onChange({ ...stage, time: val });
+      onChange({ ...data, time: val });
     } else {
       const num = parseFloat(val);
-      onChange({ ...stage, temperature: isNaN(num) ? 0 : num });
+      onChange({ ...data, [field]: isNaN(num) ? 0 : num });
     }
   };
 
   const handleRowChange = (idx: number, field: keyof LoadRow, val: string) => {
     const num = parseFloat(val);
-    const updated = [...stage.readings];
+    const updated = [...data.readings];
     updated[idx] = { ...updated[idx], [field]: isNaN(num) ? 0 : num };
-    onChange({ ...stage, readings: updated });
+    onChange({ ...data, readings: updated });
   };
 
   const handleAddRow = () => {
-    const last = stage.readings[stage.readings.length - 1];
-    onChange({ ...stage, readings: [...stage.readings, { L: (last?.L ?? 0) + 5, I: (last?.L ?? 0) + 5, dL: 0 }] });
+    const last = data.readings[data.readings.length - 1];
+    onChange({ ...data, readings: [...data.readings, { L: (last?.L ?? 0) + 10, I: (last?.L ?? 0) + 10, dL: 0 }] });
   };
 
   const handleRemoveRow = (idx: number) => {
-    if (stage.readings.length <= 1) return;
-    onChange({ ...stage, readings: stage.readings.filter((_, i) => i !== idx) });
+    if (data.readings.length <= 1) return;
+    onChange({ ...data, readings: data.readings.filter((_, i) => i !== idx) });
   };
 
   return (
@@ -102,21 +107,30 @@ function TempStagePanel({
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {/* Grid header fields */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <Label className="text-[11px] font-medium text-muted-foreground">Time</Label>
+          <Input type="text" value={data.time}
+            onChange={(e) => handleHeaderChange("time", e.target.value)}
+            disabled={disabled} className="h-7 text-xs"
+            placeholder="HH:MM" />
+        </div>
         <div className="space-y-1">
           <Label className="text-[11px] font-medium text-muted-foreground">Temperature (°C)</Label>
-          <Input type="number" step="0.1" value={stage.temperature}
-            onChange={(e) => handleFieldChange("temperature", e.target.value)}
+          <Input type="number" step="1" value={data.temperature}
+            onChange={(e) => handleHeaderChange("temperature", e.target.value)}
             disabled={disabled} className="h-7 font-mono text-xs" />
         </div>
         <div className="space-y-1">
-          <Label className="text-[11px] font-medium text-muted-foreground">Time (HH:MM)</Label>
-          <Input type="text" value={stage.time}
-            onChange={(e) => handleFieldChange("time", e.target.value)}
-            disabled={disabled} className="h-7 text-xs" placeholder="HH:MM" />
+          <Label className="text-[11px] font-medium text-muted-foreground">Rel. Humidity (%)</Label>
+          <Input type="number" step="1" min="0" max="100" value={data.humidity}
+            onChange={(e) => handleHeaderChange("humidity", e.target.value)}
+            disabled={disabled} className="h-7 font-mono text-xs" />
         </div>
       </div>
 
+      {/* Readings table */}
       <div className="overflow-x-auto rounded border border-border">
         <table className="w-full text-left text-xs">
           <thead>
@@ -129,7 +143,7 @@ function TempStagePanel({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {stage.readings.map((r, idx) => (
+            {data.readings.map((r, idx) => (
               <tr key={idx} className="hover:bg-muted/20 transition-colors">
                 <td className="py-1.5 px-2 font-medium text-foreground">{idx + 1}</td>
                 <td className="py-1.5 px-2">
@@ -150,7 +164,7 @@ function TempStagePanel({
                 <td className="py-1.5 px-2 text-right">
                   <Button type="button" variant="ghost" size="sm"
                     onClick={() => handleRemoveRow(idx)}
-                    disabled={disabled || stage.readings.length <= 1}
+                    disabled={disabled || data.readings.length <= 1}
                     className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
                     <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} className="size-3" />
                   </Button>
@@ -164,32 +178,38 @@ function TempStagePanel({
   );
 }
 
-export function TemperatureTestForm({
+export function DampHeatTestForm({
   observations,
   onObservationsChange,
   disabled = false,
-}: TemperatureTestFormProps) {
-  const [low, setLow] = useState<TempStage>(() => parseStage(observations?.low, -10));
-  const [reference, setReference] = useState<TempStage>(() => parseStage(observations?.reference, 20));
-  const [high, setHigh] = useState<TempStage>(() => parseStage(observations?.high, 40));
+}: DampHeatTestFormProps) {
+  const [initial, setInitial] = useState<GridData>(() =>
+    parseGrid(observations?.initial, 23, 50)
+  );
+  const [dampHeat, setDampHeat] = useState<GridData>(() =>
+    parseGrid(observations?.damp_heat, 40, 93)
+  );
+  const [final, setFinal] = useState<GridData>(() =>
+    parseGrid(observations?.final, 23, 50)
+  );
 
   useEffect(() => {
-    onObservationsChange({ low, reference, high });
-  }, [low, reference, high]);
+    onObservationsChange({ initial, damp_heat: dampHeat, final });
+  }, [initial, dampHeat, final]);
 
   const handleDemo = () => {
-    setLow({ temperature: -10, time: "08:00", readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setReference({ temperature: 20, time: "12:00", readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setHigh({ temperature: 40, time: "16:00", readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.001 })) });
+    setInitial({ time: "08:00", temperature: 23, humidity: 50, readings: DEMO_READINGS.map((r) => ({ ...r })) });
+    setDampHeat({ time: "16:00", temperature: 40, humidity: 93, readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.001 })) });
+    setFinal({ time: "24:00", temperature: 23, humidity: 50, readings: DEMO_READINGS.map((r) => ({ ...r })) });
   };
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Temperature Influence — 3-Stage Protocol</h4>
+          <h4 className="text-xs font-semibold text-foreground">Damp Heat, Steady State — 3-Stage Weighing Protocol</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.5.3 — Low temperature → Reference temperature → High temperature weighing comparison
+            OIML R 76-1 §B.2.2 — Initial reference → Damp heat conditioning → Final reference comparison
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
@@ -201,17 +221,17 @@ export function TemperatureTestForm({
 
       <p className="text-[11px] text-muted-foreground italic">Representative demonstration data — not a certified laboratory measurement.</p>
 
-      <TempStagePanel label="Stage 1 — Low Temperature"
+      <WeighingGridPanel label="Stage 1 — Initial Reference (Normal Conditions)"
         colorClass="border-blue-500/30 bg-blue-500/5"
-        stage={low} onChange={setLow} disabled={disabled} />
+        data={initial} onChange={setInitial} disabled={disabled} />
 
-      <TempStagePanel label="Stage 2 — Reference Temperature (20 °C)"
+      <WeighingGridPanel label="Stage 2 — Damp Heat Conditioning (40 °C / 93% RH)"
+        colorClass="border-amber-500/30 bg-amber-500/5"
+        data={dampHeat} onChange={setDampHeat} disabled={disabled} />
+
+      <WeighingGridPanel label="Stage 3 — Final Reference (After Recovery)"
         colorClass="border-emerald-500/30 bg-emerald-500/5"
-        stage={reference} onChange={setReference} disabled={disabled} />
-
-      <TempStagePanel label="Stage 3 — High Temperature"
-        colorClass="border-red-500/30 bg-red-500/5"
-        stage={high} onChange={setHigh} disabled={disabled} />
+        data={final} onChange={setFinal} disabled={disabled} />
     </div>
   );
 }

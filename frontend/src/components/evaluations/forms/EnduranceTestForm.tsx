@@ -1,11 +1,11 @@
 /**
- * METRA — components/evaluations/forms/TemperatureTestForm.tsx
- * Temperature Influence / Span Temperature Coefficient Test (OIML R 76-1 §A.5.3)
+ * METRA — components/evaluations/forms/EnduranceTestForm.tsx
+ * Endurance / Long-term Stability Test (OIML R 76-1 §A.4.9 / Annex B)
  *
- * Three temperature stages: Low, Reference, High
- * Each stage:
- *   - Header fields: Temperature (°C), Time
- *   - Weighing table: Applied Load (L) | Indication (I) | Changeover (ΔL)
+ * Captures repeated cycles of weighing over extended period:
+ *   - Number of cycles performed
+ *   - Initial and final reference weighing grids
+ *   - Intermediate spot-check readings (optional)
  */
 
 import { useState, useEffect } from "react";
@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export interface TemperatureTestFormProps {
+export interface EnduranceTestFormProps {
   testId: string;
   testName: string;
   observations: Record<string, any>;
@@ -29,9 +29,8 @@ interface LoadRow {
   dL: number;
 }
 
-interface TempStage {
-  temperature: number;
-  time: string;
+interface EnduranceStage {
+  cycle_count: number;
   readings: LoadRow[];
 }
 
@@ -39,20 +38,19 @@ const DEMO_READINGS: LoadRow[] = [
   { L: 0, I: 0, dL: 0 },
 ];
 
-function parseStage(raw: any, defaultTemp: number): TempStage {
+function parseStage(raw: any, defaultCycles: number): EnduranceStage {
   if (raw && typeof raw === "object") {
     return {
-      temperature: Number(raw.temperature ?? defaultTemp),
-      time: String(raw.time ?? ""),
+      cycle_count: Number(raw.cycle_count ?? defaultCycles),
       readings: Array.isArray(raw.readings) && raw.readings.length > 0
         ? raw.readings.map((r: any) => ({ L: Number(r.L ?? 0), I: Number(r.I ?? 0), dL: Number(r.dL ?? 0) }))
         : DEMO_READINGS.map((r) => ({ ...r })),
     };
   }
-  return { temperature: defaultTemp, time: "", readings: DEMO_READINGS.map((r) => ({ ...r })) };
+  return { cycle_count: defaultCycles, readings: DEMO_READINGS.map((r) => ({ ...r })) };
 }
 
-function TempStagePanel({
+function EnduranceStagePanel({
   label,
   colorClass,
   stage,
@@ -61,19 +59,10 @@ function TempStagePanel({
 }: {
   label: string;
   colorClass: string;
-  stage: TempStage;
-  onChange: (s: TempStage) => void;
+  stage: EnduranceStage;
+  onChange: (s: EnduranceStage) => void;
   disabled: boolean;
 }) {
-  const handleFieldChange = (field: "temperature" | "time", val: string) => {
-    if (field === "time") {
-      onChange({ ...stage, time: val });
-    } else {
-      const num = parseFloat(val);
-      onChange({ ...stage, temperature: isNaN(num) ? 0 : num });
-    }
-  };
-
   const handleRowChange = (idx: number, field: keyof LoadRow, val: string) => {
     const num = parseFloat(val);
     const updated = [...stage.readings];
@@ -102,19 +91,11 @@ function TempStagePanel({
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1">
-          <Label className="text-[11px] font-medium text-muted-foreground">Temperature (°C)</Label>
-          <Input type="number" step="0.1" value={stage.temperature}
-            onChange={(e) => handleFieldChange("temperature", e.target.value)}
-            disabled={disabled} className="h-7 font-mono text-xs" />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-[11px] font-medium text-muted-foreground">Time (HH:MM)</Label>
-          <Input type="text" value={stage.time}
-            onChange={(e) => handleFieldChange("time", e.target.value)}
-            disabled={disabled} className="h-7 text-xs" placeholder="HH:MM" />
-        </div>
+      <div className="flex items-center gap-3">
+        <Label className="text-[11px] font-medium text-muted-foreground shrink-0">Cycle Count:</Label>
+        <Input type="number" step="1" min="0" value={stage.cycle_count}
+          onChange={(e) => onChange({ ...stage, cycle_count: parseInt(e.target.value) || 0 })}
+          disabled={disabled} className="h-7 w-24 font-mono text-xs" />
       </div>
 
       <div className="overflow-x-auto rounded border border-border">
@@ -164,32 +145,34 @@ function TempStagePanel({
   );
 }
 
-export function TemperatureTestForm({
+export function EnduranceTestForm({
   observations,
   onObservationsChange,
   disabled = false,
-}: TemperatureTestFormProps) {
-  const [low, setLow] = useState<TempStage>(() => parseStage(observations?.low, -10));
-  const [reference, setReference] = useState<TempStage>(() => parseStage(observations?.reference, 20));
-  const [high, setHigh] = useState<TempStage>(() => parseStage(observations?.high, 40));
+}: EnduranceTestFormProps) {
+  const [initial, setInitial] = useState<EnduranceStage>(() =>
+    parseStage(observations?.initial, 0)
+  );
+  const [final, setFinal] = useState<EnduranceStage>(() =>
+    parseStage(observations?.final, 10000)
+  );
 
   useEffect(() => {
-    onObservationsChange({ low, reference, high });
-  }, [low, reference, high]);
+    onObservationsChange({ initial, final });
+  }, [initial, final]);
 
   const handleDemo = () => {
-    setLow({ temperature: -10, time: "08:00", readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setReference({ temperature: 20, time: "12:00", readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setHigh({ temperature: 40, time: "16:00", readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.001 })) });
+    setInitial({ cycle_count: 0, readings: DEMO_READINGS.map((r) => ({ ...r })) });
+    setFinal({ cycle_count: 10000, readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.002 })) });
   };
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Temperature Influence — 3-Stage Protocol</h4>
+          <h4 className="text-xs font-semibold text-foreground">Endurance Test — Initial vs Final Reference</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.5.3 — Low temperature → Reference temperature → High temperature weighing comparison
+            OIML R 76-1 §A.4.9 — Record reference weighing before and after endurance cycling
           </p>
         </div>
         <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
@@ -201,17 +184,13 @@ export function TemperatureTestForm({
 
       <p className="text-[11px] text-muted-foreground italic">Representative demonstration data — not a certified laboratory measurement.</p>
 
-      <TempStagePanel label="Stage 1 — Low Temperature"
+      <EnduranceStagePanel label="Initial Reference (Before Endurance Cycles)"
         colorClass="border-blue-500/30 bg-blue-500/5"
-        stage={low} onChange={setLow} disabled={disabled} />
+        stage={initial} onChange={setInitial} disabled={disabled} />
 
-      <TempStagePanel label="Stage 2 — Reference Temperature (20 °C)"
-        colorClass="border-emerald-500/30 bg-emerald-500/5"
-        stage={reference} onChange={setReference} disabled={disabled} />
-
-      <TempStagePanel label="Stage 3 — High Temperature"
-        colorClass="border-red-500/30 bg-red-500/5"
-        stage={high} onChange={setHigh} disabled={disabled} />
+      <EnduranceStagePanel label="Final Reference (After Endurance Cycles)"
+        colorClass="border-amber-500/30 bg-amber-500/5"
+        stage={final} onChange={setFinal} disabled={disabled} />
     </div>
   );
 }

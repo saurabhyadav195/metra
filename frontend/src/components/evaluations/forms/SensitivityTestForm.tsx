@@ -1,11 +1,12 @@
 /**
- * METRA — components/evaluations/forms/ZeroSettingTestForm.tsx
- * Zero-Setting / Tare Range Test (OIML R 76-1 §A.4.2.1, §A.4.2.3, §A.4.11.2)
+ * METRA — components/evaluations/forms/SensitivityTestForm.tsx
+ * Sensitivity of the Equilibrium Test (OIML R 76-1 §A.4.8.1)
  *
- * Captures observations for:
- *   - Initial indication at zero (E₀)
- *   - Multiple tare/zero operations with indication readings
- *   - Changeover weights for each zero-setting step
+ * Captures:
+ *   - Multiple load points
+ *   - Indication before adding small extra weight
+ *   - Indication after adding extra weight (~0.4d to 1.4d)
+ *   - Extra weight applied (d_extra)
  */
 
 import { useState, useEffect } from "react";
@@ -15,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export interface ZeroSettingTestFormProps {
+export interface SensitivityTestFormProps {
   testId: string;
   testName: string;
   observations: Record<string, any>;
@@ -23,75 +24,60 @@ export interface ZeroSettingTestFormProps {
   disabled?: boolean;
 }
 
-interface ZeroRow {
-  step: number;
-  load: number;
-  indication: number;
-  dL: number;
-  note: string;
+interface SensitivityRow {
+  test_load: number;
+  I_before: number;
+  d_extra: number;
+  I_after: number;
 }
 
-const DEFAULT_ROWS: ZeroRow[] = [
-  { step: 1, load: 0, indication: 0, dL: 0, note: "Initial zero" },
+const DEFAULT_ROWS: SensitivityRow[] = [
+  { test_load: 0, I_before: 0, d_extra: 0, I_after: 0 },
 ];
 
-export function ZeroSettingTestForm({
+export function SensitivityTestForm({
   observations,
   onObservationsChange,
   disabled = false,
-}: ZeroSettingTestFormProps) {
-  const parseRows = (): ZeroRow[] => {
-    if (observations?.steps && Array.isArray(observations.steps) && observations.steps.length > 0) {
-      return observations.steps.map((r: any, i: number) => ({
-        step: i + 1,
-        load: Number(r.L ?? r.load ?? 0),
-        indication: Number(r.I ?? r.indication ?? 0),
-        dL: Number(r.dL ?? 0),
-        note: String(r.note ?? ""),
+}: SensitivityTestFormProps) {
+  const [d, setD] = useState<number>(observations?.d !== undefined ? Number(observations.d) : 0.01);
+
+  const parseRows = (): SensitivityRow[] => {
+    if (observations?.rows && Array.isArray(observations.rows) && observations.rows.length > 0) {
+      return observations.rows.map((r: any) => ({
+        test_load: Number(r.test_load ?? r.L ?? 0),
+        I_before: Number(r.I_before ?? 0),
+        d_extra: Number(r.d_extra ?? 0),
+        I_after: Number(r.I_after ?? 0),
       }));
     }
     return DEFAULT_ROWS;
   };
 
-  const [rows, setRows] = useState<ZeroRow[]>(parseRows);
-  const [E0, setE0] = useState<number>(
-    observations?.E0 !== undefined ? Number(observations.E0) : 0
-  );
+  const [rows, setRows] = useState<SensitivityRow[]>(parseRows);
 
   useEffect(() => {
-    onObservationsChange({
-      E0,
-      steps: rows.map((r) => ({
-        L: r.load,
-        I: r.indication,
-        dL: r.dL,
-        note: r.note,
-      })),
-    });
-  }, [E0, rows]);
+    onObservationsChange({ d, rows });
+  }, [d, rows]);
 
-  const handleChange = (idx: number, field: keyof ZeroRow, val: string) => {
+  const handleChange = (idx: number, field: keyof SensitivityRow, val: string) => {
+    const num = parseFloat(val);
     const updated = [...rows];
-    if (field === "note") {
-      updated[idx] = { ...updated[idx], note: val };
-    } else {
-      const num = parseFloat(val);
-      updated[idx] = { ...updated[idx], [field]: isNaN(num) ? 0 : num };
-    }
+    updated[idx] = { ...updated[idx], [field]: isNaN(num) ? 0 : num };
     setRows(updated);
   };
 
   const handleAddRow = () => {
-    setRows([...rows, { step: rows.length + 1, load: 0, indication: 0, dL: 0, note: "" }]);
+    setRows([...rows, { test_load: 0, I_before: 0, d_extra: 0.004, I_after: 0 }]);
   };
 
   const handleRemoveRow = (idx: number) => {
     if (rows.length <= 1) return;
-    setRows(rows.filter((_, i) => i !== idx).map((r, i) => ({ ...r, step: i + 1 })));
+    setRows(rows.filter((_, i) => i !== idx));
   };
 
   const handleDemo = () => {
-    setE0(0);
+    setD(0.01);
     setRows(DEFAULT_ROWS);
   };
 
@@ -99,9 +85,9 @@ export function ZeroSettingTestForm({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Zero Setting / Tare Range — Step Observations</h4>
+          <h4 className="text-xs font-semibold text-foreground">Sensitivity of Equilibrium — Load Step Observations</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.4.2 — Record indication at zero and after each tare/zero operation
+            OIML R 76-1 §A.4.8.1 — Add small extra weight; verify indication changes by ≥ d
           </p>
         </div>
         <div className="flex gap-2">
@@ -113,18 +99,17 @@ export function ZeroSettingTestForm({
           <Button type="button" variant="outline" size="sm" onClick={handleAddRow} disabled={disabled}
             className="h-7 text-xs gap-1">
             <HugeiconsIcon icon={AddSquareIcon} strokeWidth={2} className="size-3.5" />
-            Add Step
+            Add Load
           </Button>
         </div>
       </div>
 
-      {/* E0 field */}
+      {/* Scale interval d */}
       <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1 max-w-xs">
-        <Label className="text-xs font-semibold text-foreground">Initial Zero Error (E₀) [kg]:</Label>
-        <p className="text-[10px] text-muted-foreground">Reference zero error before operations</p>
+        <Label className="text-xs font-semibold text-foreground">Scale Interval (d) [kg]:</Label>
         <div className="flex items-center gap-1.5">
-          <Input type="number" step="0.0001" value={E0}
-            onChange={(e) => setE0(parseFloat(e.target.value) || 0)}
+          <Input type="number" step="0.001" min="0" value={d}
+            onChange={(e) => setD(parseFloat(e.target.value) || 0)}
             disabled={disabled} className="h-8 font-mono text-xs bg-background" />
           <span className="text-xs text-muted-foreground font-medium shrink-0">kg</span>
         </div>
@@ -134,37 +119,37 @@ export function ZeroSettingTestForm({
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-border bg-muted/40 font-medium text-muted-foreground">
-              <th className="py-2.5 px-3">Step</th>
-              <th className="py-2.5 px-3">Applied Load (L) [kg]</th>
-              <th className="py-2.5 px-3">Indication (I) [kg]</th>
-              <th className="py-2.5 px-3 text-amber-600 dark:text-amber-400">Changeover (ΔL) [kg]</th>
-              <th className="py-2.5 px-3">Note</th>
+              <th className="py-2.5 px-3">#</th>
+              <th className="py-2.5 px-3">Test Load (L) [kg]</th>
+              <th className="py-2.5 px-3">Indication Before (I₁) [kg]</th>
+              <th className="py-2.5 px-3 text-amber-600 dark:text-amber-400">Extra Weight (d_extra) [kg]</th>
+              <th className="py-2.5 px-3">Indication After (I₂) [kg]</th>
               <th className="py-2.5 px-3 text-right">Del</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
             {rows.map((row, idx) => (
               <tr key={idx} className="hover:bg-muted/20 transition-colors">
-                <td className="py-1.5 px-3 font-medium text-foreground">{row.step}</td>
+                <td className="py-1.5 px-3 font-medium text-foreground">{idx + 1}</td>
                 <td className="py-1.5 px-3">
-                  <Input type="number" step="0.001" value={row.load}
-                    onChange={(e) => handleChange(idx, "load", e.target.value)}
+                  <Input type="number" step="0.001" value={row.test_load}
+                    onChange={(e) => handleChange(idx, "test_load", e.target.value)}
                     disabled={disabled} className="h-7 w-24 font-mono text-xs" />
                 </td>
                 <td className="py-1.5 px-3">
-                  <Input type="number" step="0.001" value={row.indication}
-                    onChange={(e) => handleChange(idx, "indication", e.target.value)}
+                  <Input type="number" step="0.001" value={row.I_before}
+                    onChange={(e) => handleChange(idx, "I_before", e.target.value)}
                     disabled={disabled} className="h-7 w-24 font-mono text-xs" />
                 </td>
                 <td className="py-1.5 px-3">
-                  <Input type="number" step="0.0001" min="0" value={row.dL}
-                    onChange={(e) => handleChange(idx, "dL", e.target.value)}
-                    disabled={disabled} className="h-7 w-20 font-mono text-xs border-amber-400/50" />
+                  <Input type="number" step="0.0001" min="0" value={row.d_extra}
+                    onChange={(e) => handleChange(idx, "d_extra", e.target.value)}
+                    disabled={disabled} className="h-7 w-24 font-mono text-xs border-amber-400/50" />
                 </td>
                 <td className="py-1.5 px-3">
-                  <Input type="text" value={row.note}
-                    onChange={(e) => handleChange(idx, "note", e.target.value)}
-                    disabled={disabled} className="h-7 w-32 text-xs" placeholder="Optional note" />
+                  <Input type="number" step="0.001" value={row.I_after}
+                    onChange={(e) => handleChange(idx, "I_after", e.target.value)}
+                    disabled={disabled} className="h-7 w-24 font-mono text-xs" />
                 </td>
                 <td className="py-1.5 px-3 text-right">
                   <Button type="button" variant="ghost" size="sm"

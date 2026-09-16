@@ -1,5 +1,5 @@
 /**
- * METRA — components/evaluation/TestResultsDisplay.tsx
+ * METRA — components/evaluations/TestResultsDisplay.tsx
  * Displays structured calculation results from backend engine for any test type.
  */
 

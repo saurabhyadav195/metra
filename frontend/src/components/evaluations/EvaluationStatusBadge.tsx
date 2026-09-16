@@ -1,5 +1,5 @@
 /**
- * METRA — components/evaluation/EvaluationStatusBadge.tsx
+ * METRA — components/evaluations/EvaluationStatusBadge.tsx
  * Status badge for evaluation and test result states.
  */
 

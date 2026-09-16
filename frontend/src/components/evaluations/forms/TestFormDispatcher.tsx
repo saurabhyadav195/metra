@@ -32,6 +32,13 @@ import { ZeroSettingTestForm } from "./ZeroSettingTestForm";
 import { TemperatureTestForm } from "./TemperatureTestForm";
 import { VoltageVariationTestForm } from "./VoltageVariationTestForm";
 import { EMCElectricalTestForm } from "./EMCElectricalTestForm";
+import { DampHeatTestForm } from "./DampHeatTestForm";
+import { DiscriminationTestForm } from "./DiscriminationTestForm";
+import { SensitivityTestForm } from "./SensitivityTestForm";
+import { TiltingTestForm } from "./TiltingTestForm";
+import { CreepTestForm } from "./CreepTestForm";
+import { EnduranceTestForm } from "./EnduranceTestForm";
+import { StabilityEquilibriumTestForm } from "./StabilityEquilibriumTestForm";
 import { GenericObservationForm } from "./GenericObservationForm";
 
 export interface TestFormDispatcherProps {
@@ -94,7 +101,27 @@ export function TestFormDispatcher({
   // the test name "Stability of Equilibrium" contains the word "equilibrium",
   // which was previously matched by the EMCElectricalTestForm catch-all.
   if (normalizedId === "TEST-A.4.12") {
-    return <WeighingTestForm {...commonProps} />;
+    return <StabilityEquilibriumTestForm {...commonProps} />;
+  }
+
+  // ── 6b. Discrimination Test (TEST-A.4.8.2) ────────────────────────────────────
+  if (normalizedId === "TEST-A.4.8.2") {
+    return <DiscriminationTestForm {...commonProps} />;
+  }
+
+  // ── 6c. Sensitivity / Equilibrium Test (TEST-A.4.8.1) ────────────────────────
+  if (normalizedId === "TEST-A.4.8.1") {
+    return <SensitivityTestForm {...commonProps} />;
+  }
+
+  // ── 6d. Creep Test (TEST-A.4.9) ──────────────────────────────────────────────
+  if (normalizedId === "TEST-A.4.9") {
+    return <CreepTestForm {...commonProps} />;
+  }
+
+  // ── 6e. Tilting / Out-of-Level Test (TEST-A.4.11.1) ──────────────────────────
+  if (normalizedId === "TEST-A.4.11.1") {
+    return <TiltingTestForm {...commonProps} />;
   }
 
   // ── 7. Temperature Tests (TEST-A.5.3.1, TEST-A.5.3.2) ───────────────────────
@@ -158,20 +185,40 @@ export function TestFormDispatcher({
     return <VoltageVariationTestForm {...commonProps} />;
   }
 
+  if (lowerId.includes("damp") || lowerId.includes("humidity")) {
+    return <DampHeatTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("discrimination")) {
+    return <DiscriminationTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("sensitivity") || lowerId.includes("sense")) {
+    return <SensitivityTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("tilting") || lowerId.includes("tilt")) {
+    return <TiltingTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("creep")) {
+    return <CreepTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("endurance")) {
+    return <EnduranceTestForm {...commonProps} />;
+  }
+
+  if (lowerId.includes("stability") || lowerId.includes("span")) {
+    return <StabilityEquilibriumTestForm {...commonProps} />;
+  }
+
   if (
-    lowerId.includes("damp") ||
     lowerId.includes("burst") ||
     lowerId.includes("esd") ||
     lowerId.includes("radiated") ||
     lowerId.includes("conducted") ||
-    lowerId.includes("dip") ||
-    lowerId.includes("span") ||
-    lowerId.includes("sense") ||
-    lowerId.includes("tilting") ||
-    lowerId.includes("endurance") ||
-    lowerId.includes("discrimination") ||
-    lowerId.includes("sensitivity") ||
-    lowerId.includes("creep")
+    lowerId.includes("dip")
   ) {
     return <EMCElectricalTestForm {...commonProps} />;
   }

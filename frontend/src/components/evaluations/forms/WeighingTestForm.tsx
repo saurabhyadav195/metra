@@ -1,6 +1,15 @@
 /**
  * METRA — components/evaluations/forms/WeighingTestForm.tsx
  * Specialized observation form for Weighing Performance Test (OIML R 76-1 §A.4.4)
+ *
+ * Raw observation fields only:
+ *   - Applied Load (L)
+ *   - Indication (I)          ← digital display reading
+ *   - Changeover Weight (ΔL)  ← extra mass added above I to trigger +1d change
+ *   - Direction toggle (↑ Increasing / ↓ Decreasing per row)
+ *
+ * The frontend does NOT pre-calculate E = I − L (that is the backend engine's job).
+ * P = I + 0.5e − ΔL is computed server-side by the OIML rule evaluator.
  */
 
 import { useState, useEffect } from "react";
@@ -8,7 +17,6 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import { AddSquareIcon, Delete02Icon, SparklesIcon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 export interface WeighingTestFormProps {
   testId: string;
@@ -18,26 +26,15 @@ export interface WeighingTestFormProps {
   disabled?: boolean;
 }
 
-export interface ReadingRow {
+export interface WeighingRow {
   load: number;
   indication: number;
-  dL?: number;
+  dL: number;
+  direction: "increasing" | "decreasing";
 }
 
-const DEMO_READINGS: ReadingRow[] = [
-  { load: 0.02, indication: 0.02, dL: 0 },
-  { load: 0.04, indication: 0.04, dL: 0 },
-  { load: 0.5, indication: 0.5, dL: 0 },
-  { load: 1.0, indication: 1.0, dL: 0 },
-  { load: 2.0, indication: 2.0, dL: 0 },
-  { load: 3.0, indication: 3.0, dL: 0 },
-  { load: 4.0, indication: 4.0, dL: 0 },
-  { load: 5.0, indication: 5.0, dL: 0 },
-  { load: 5.99, indication: 5.99, dL: 0 },
-  { load: 8.0, indication: 8.0, dL: 0 },
-  { load: 10.0, indication: 10.0, dL: 0 },
-  { load: 12.5, indication: 12.5, dL: 0 },
-  { load: 15.0, indication: 15.0, dL: 0 },
+const DEMO_READINGS: WeighingRow[] = [
+  { load: 0, indication: 0, dL: 0, direction: "increasing" },
 ];
 
 export function WeighingTestForm({
@@ -45,95 +42,70 @@ export function WeighingTestForm({
   onObservationsChange,
   disabled = false,
 }: WeighingTestFormProps) {
-  const initialReadings: ReadingRow[] =
+  const initialReadings: WeighingRow[] =
     observations?.readings && Array.isArray(observations.readings) && observations.readings.length > 0
-      ? observations.readings
+      ? observations.readings.map((r: any) => ({
+          load: Number(r.load ?? r.L ?? 0),
+          indication: Number(r.indication ?? r.I ?? 0),
+          dL: Number(r.dL ?? 0),
+          direction: (r.direction === "decreasing" ? "decreasing" : "increasing") as "increasing" | "decreasing",
+        }))
       : DEMO_READINGS;
 
-  const [readings, setReadings] = useState<ReadingRow[]>(initialReadings);
-  const [verificationType, setVerificationType] = useState<"initial" | "service">(
-    observations?.verification_type || "initial"
-  );
+  const [rows, setRows] = useState<WeighingRow[]>(initialReadings);
 
   useEffect(() => {
-    onObservationsChange({
-      readings,
-      load_steps: readings.map((r) => ({
-        L: Number(r.load),
-        I: Number(r.indication),
-        load: Number(r.load),
-        indication: Number(r.indication),
-        applied_load: Number(r.load),
-        indicated_value: Number(r.indication),
-        dL: Number(r.dL || 0),
-      })),
-      verification_type: verificationType,
-    });
-  }, [readings, verificationType]);
+    const formatted = rows.map((r) => ({
+      L: Number(r.load),
+      I: Number(r.indication),
+      dL: Number(r.dL),
+      direction: r.direction,
+    }));
+    onObservationsChange({ readings: formatted, load_steps: formatted });
+  }, [rows]);
+
+  const handleChange = (idx: number, field: keyof WeighingRow, val: string) => {
+    const updated = [...rows];
+    if (field === "direction") {
+      updated[idx] = { ...updated[idx], direction: val as "increasing" | "decreasing" };
+    } else {
+      const num = parseFloat(val);
+      updated[idx] = { ...updated[idx], [field]: isNaN(num) ? 0 : num };
+    }
+    setRows(updated);
+  };
 
   const handleAddRow = () => {
-    const last = readings[readings.length - 1];
-    const nextLoad = (last?.load || 0) + 50;
-    setReadings([...readings, { load: nextLoad, indication: nextLoad, dL: 0 }]);
+    const last = rows[rows.length - 1];
+    setRows([...rows, { load: (last?.load ?? 0) + 1, indication: (last?.load ?? 0) + 1, dL: 0, direction: last?.direction ?? "increasing" }]);
   };
 
   const handleRemoveRow = (idx: number) => {
-    if (readings.length <= 1) return;
-    setReadings(readings.filter((_, i) => i !== idx));
+    if (rows.length <= 1) return;
+    setRows(rows.filter((_, i) => i !== idx));
   };
 
-  const handleChange = (idx: number, field: keyof ReadingRow, val: string) => {
-    const num = parseFloat(val);
-    const updated = [...readings];
-    updated[idx] = {
-      ...updated[idx],
-      [field]: isNaN(num) ? 0 : num,
-    };
-    setReadings(updated);
-  };
-
-  const handleLoadDemoData = () => {
-    setReadings(DEMO_READINGS);
-  };
+  const handleLoadDemoData = () => setRows(DEMO_READINGS);
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div className="flex items-center gap-3">
-          <Label className="text-xs font-semibold text-foreground">Verification Stage:</Label>
-          <select
-            value={verificationType}
-            onChange={(e) => setVerificationType(e.target.value as "initial" | "service")}
-            disabled={disabled}
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground font-medium shadow-sm focus:outline-none focus:ring-1 focus:ring-primary"
-          >
-            <option value="initial">Initial Verification (MPE Table 6)</option>
-            <option value="service">In-Service Inspection (2 × MPE)</option>
-          </select>
+        <div>
+          <h4 className="text-xs font-semibold text-foreground">Weighing Test — Load Step Observations</h4>
+          <p className="text-[11px] text-muted-foreground">
+            OIML R 76-1 §A.4.4 — Record Indication (I) and Changeover Weight (ΔL) for each applied load (L)
+          </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleLoadDemoData}
-            disabled={disabled}
-            className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
-          >
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm" onClick={handleLoadDemoData} disabled={disabled}
+            className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
             <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-            Load Sample Observations
+            Load Sample
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAddRow}
-            disabled={disabled}
-            className="h-7 text-xs gap-1"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={handleAddRow} disabled={disabled}
+            className="h-7 text-xs gap-1">
             <HugeiconsIcon icon={AddSquareIcon} strokeWidth={2} className="size-3.5" />
-            Add Load Step
+            Add Row
           </Button>
         </div>
       </div>
@@ -146,59 +118,54 @@ export function WeighingTestForm({
         <table className="w-full text-left text-xs">
           <thead>
             <tr className="border-b border-border bg-muted/40 font-medium text-muted-foreground">
-              <th className="py-2.5 px-3">Point #</th>
-              <th className="py-2.5 px-3">Applied Load (m) [kg]</th>
-              <th className="py-2.5 px-3">Indicated Value (I) [kg]</th>
-              <th className="py-2.5 px-3">Error (E = I - m) [kg]</th>
-              <th className="py-2.5 px-3 text-right">Action</th>
+              <th className="py-2.5 px-3">#</th>
+              <th className="py-2.5 px-3">Direction</th>
+              <th className="py-2.5 px-3">Applied Load (L) [kg]</th>
+              <th className="py-2.5 px-3">Indication (I) [kg]</th>
+              <th className="py-2.5 px-3 text-amber-600 dark:text-amber-400">Changeover (ΔL) [kg]</th>
+              <th className="py-2.5 px-3 text-right">Del</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {readings.map((r, i) => {
-              const err = r.indication - r.load;
-              return (
-                <tr key={i} className="hover:bg-muted/20 transition-colors">
-                  <td className="py-2 px-3 font-medium text-foreground">{i + 1}</td>
-                  <td className="py-2 px-3">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={r.load}
-                      onChange={(e) => handleChange(i, "load", e.target.value)}
-                      disabled={disabled}
-                      className="h-8 w-32 font-mono text-xs"
-                    />
-                  </td>
-                  <td className="py-2 px-3">
-                    <Input
-                      type="number"
-                      step="0.01"
-                      value={r.indication}
-                      onChange={(e) => handleChange(i, "indication", e.target.value)}
-                      disabled={disabled}
-                      className="h-8 w-32 font-mono text-xs"
-                    />
-                  </td>
-                  <td className="py-2 px-3">
-                    <span className="inline-block rounded border border-border/60 bg-muted/60 px-2 py-0.5 font-mono text-xs font-semibold text-foreground">
-                      {err >= 0 ? `+${err.toFixed(2)}` : err.toFixed(2)}
-                    </span>
-                  </td>
-                  <td className="py-2 px-3 text-right">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleRemoveRow(i)}
-                      disabled={disabled || readings.length <= 1}
-                      className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} className="size-3.5" />
-                    </Button>
-                  </td>
-                </tr>
-              );
-            })}
+            {rows.map((row, idx) => (
+              <tr key={idx} className={`hover:bg-muted/20 transition-colors ${row.direction === "decreasing" ? "bg-blue-500/5" : ""}`}>
+                <td className="py-1.5 px-3 font-medium text-foreground">{idx + 1}</td>
+                <td className="py-1.5 px-3">
+                  <select
+                    value={row.direction}
+                    onChange={(e) => handleChange(idx, "direction", e.target.value)}
+                    disabled={disabled}
+                    className="h-7 rounded border border-border bg-background px-1 text-xs font-medium focus:outline-none focus:ring-1 focus:ring-primary"
+                  >
+                    <option value="increasing">↑ Increasing</option>
+                    <option value="decreasing">↓ Decreasing</option>
+                  </select>
+                </td>
+                <td className="py-1.5 px-3">
+                  <Input type="number" step="0.001" value={row.load}
+                    onChange={(e) => handleChange(idx, "load", e.target.value)}
+                    disabled={disabled} className="h-7 w-28 font-mono text-xs" />
+                </td>
+                <td className="py-1.5 px-3">
+                  <Input type="number" step="0.001" value={row.indication}
+                    onChange={(e) => handleChange(idx, "indication", e.target.value)}
+                    disabled={disabled} className="h-7 w-28 font-mono text-xs" />
+                </td>
+                <td className="py-1.5 px-3">
+                  <Input type="number" step="0.0001" min="0" value={row.dL}
+                    onChange={(e) => handleChange(idx, "dL", e.target.value)}
+                    disabled={disabled} className="h-7 w-24 font-mono text-xs border-amber-400/50" />
+                </td>
+                <td className="py-1.5 px-3 text-right">
+                  <Button type="button" variant="ghost" size="sm"
+                    onClick={() => handleRemoveRow(idx)}
+                    disabled={disabled || rows.length <= 1}
+                    className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive">
+                    <HugeiconsIcon icon={Delete02Icon} strokeWidth={2} className="size-3" />
+                  </Button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
