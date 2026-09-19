@@ -704,6 +704,8 @@ def test_stability_of_equilibrium_evaluation():
     3. Compares |E| against limit = 0.25 * e1.
     4. Evaluates PASS when all readings satisfy limit, and FAIL when any reading exceeds limit.
     """
+    from app.services.evaluation_service import EvaluationService
+
     evaluator = RuleEvaluator()
     svc = EvaluationService(client=None)
 
@@ -754,6 +756,159 @@ def test_stability_of_equilibrium_evaluation():
 
     spec_fail = svc._calculate_stability_of_equilibrium_test(ctx, obs_fail, {})
     assert spec_fail["status"] == "FAIL"
+
+
+def test_voltage_variations_evaluation():
+    """
+    Verifies Voltage Variations Test (TEST-A.5.4):
+    1. Parses nested stage dictionaries ('reference', 'low', 'high').
+    2. Calculates indication P = I + 0.5*e - dL, error E = P - L, and corrected error Ec = E - E0.
+    3. Compares |Ec| against MPE limit.
+    4. Evaluates PASS when all stage readings satisfy MPE limit, and FAIL when any stage reading exceeds MPE limit.
+    """
+    from app.services.evaluation_service import EvaluationService
+
+    evaluator = RuleEvaluator()
+    svc = EvaluationService(client=None)
+
+    ctx = EvaluationContext(
+        instrument_id="inst_volt",
+        max_capacity=100.0,
+        e_resolution=0.01,
+        e1_resolution=0.01,
+        d_resolution=0.001,
+        accuracy_class="III",
+        unit="kg"
+    )
+
+    # 1. PASS payload (nested by voltage stage)
+    # L=10.0, I=10.000, dL=0.005 -> P = 10.000 + 0.005 - 0.005 = 10.000 -> E = 0.0 -> Ec = 0.0 <= MPE (0.01 kg) -> PASS
+    obs_pass = {
+        "power_supply_type": "ac_mains",
+        "U_nom": 230,
+        "reference": {
+            "voltage": 230,
+            "readings": [{"L": 10.0, "I": 10.000, "dL": 0.005}]
+        },
+        "low": {
+            "voltage": 195.5,
+            "readings": [{"L": 10.0, "I": 10.000, "dL": 0.005}]
+        },
+        "high": {
+            "voltage": 253,
+            "readings": [{"L": 10.0, "I": 10.000, "dL": 0.005}]
+        }
+    }
+
+    res_pass = evaluator.evaluate_test("TEST-A.5.4", ctx, obs_pass)
+    assert res_pass.status == TestExecutionStatus.PASS, f"Expected PASS, got {res_pass.status}: {res_pass.summary_message}"
+    assert len(res_pass.calculations) == 3
+    for c in res_pass.calculations:
+        assert c.decision == "PASS"
+
+    spec_pass = svc._calculate_voltage_variations_test(ctx, obs_pass, {})
+    assert spec_pass["status"] == "PASS"
+    assert len(spec_pass["rows"]) == 3
+
+    # 2. FAIL payload (low voltage has excessive error)
+    # Low voltage: L=10.0, I=10.020, dL=0.000 -> P = 10.025 -> E = 0.025 -> Ec = 0.025 > MPE 0.010 -> FAIL
+    obs_fail = {
+        "power_supply_type": "ac_mains",
+        "U_nom": 230,
+        "reference": {
+            "voltage": 230,
+            "readings": [{"L": 10.0, "I": 10.000, "dL": 0.005}]
+        },
+        "low": {
+            "voltage": 195.5,
+            "readings": [{"L": 10.0, "I": 10.020, "dL": 0.000}]  # P = 10.025, E = 0.025 > MPE 0.010 -> FAIL
+        }
+    }
+
+    # 3. Payload with omitted metadata (power_supply_type and U_nom omitted) -> should default and pass validation
+    obs_no_meta = {
+        "reference": {
+            "voltage": 230,
+            "readings": [{"L": 10.0, "I": 10.000, "dL": 0.005}]
+        },
+        "low": {
+            "voltage": 195.5,
+            "readings": [{"L": 10.0, "I": 10.000, "dL": 0.005}]
+        }
+    }
+    res_no_meta = evaluator.evaluate_test("TEST-A.5.4", ctx, obs_no_meta)
+    assert res_no_meta.status == TestExecutionStatus.PASS, f"Expected PASS for omitted metadata, got {res_no_meta.status}: {res_no_meta.summary_message}"
+
+
+def test_endurance_evaluation():
+    """
+    Verifies Endurance Test (TEST-A.6):
+    1. Parses initial (pre-endurance) and final (post-endurance) weighing readings and cycle count.
+    2. Calculates initial error E_init, final error E_final, and durability error = |E_final - E_init|.
+    3. Compares durability error against MPE limit.
+    4. Evaluates PASS when durability error <= MPE, and FAIL when durability error > MPE.
+    """
+    from app.services.evaluation_service import EvaluationService
+
+    evaluator = RuleEvaluator()
+    svc = EvaluationService(client=None)
+
+    ctx = EvaluationContext(
+        instrument_id="inst_endurance",
+        max_capacity=100.0,
+        e_resolution=0.01,
+        e1_resolution=0.01,
+        d_resolution=0.001,
+        accuracy_class="III",
+        unit="kg"
+    )
+
+    # 1. PASS payload (initial vs final errors match within MPE = 0.01 kg)
+    obs_pass = {
+        "load_cycles": 100000,
+        "test_load": 50.0,
+        "initial": {
+            "cycle_count": 0,
+            "readings": [{"L": 50.0, "I": 50.000, "dL": 0.005}]
+        },
+        "final": {
+            "cycle_count": 100000,
+            "readings": [{"L": 50.0, "I": 50.000, "dL": 0.005}]
+        }
+    }
+
+    res_pass = evaluator.evaluate_test("TEST-A.6", ctx, obs_pass)
+    assert res_pass.status == TestExecutionStatus.PASS, f"Expected PASS, got {res_pass.status}: {res_pass.summary_message}"
+    assert len(res_pass.calculations) == 1
+    assert res_pass.calculations[0].decision == "PASS"
+
+    spec_pass = svc._calculate_endurance_test(ctx, obs_pass, {})
+    assert spec_pass["status"] == "PASS"
+    assert spec_pass["cycle_count"] == 100000
+    assert len(spec_pass["rows"]) == 1
+
+    # 2. FAIL payload (durability error exceeds MPE)
+    # Init: E_init = 0.0, Final: L=50.0, I=50.025, dL=0.000 -> P_final = 50.030, E_final = 0.030 -> Durability error = 0.030 > MPE 0.010 -> FAIL
+    obs_fail = {
+        "load_cycles": 100000,
+        "initial": {
+            "cycle_count": 0,
+            "readings": [{"L": 50.0, "I": 50.000, "dL": 0.005}]
+        },
+        "final": {
+            "cycle_count": 100000,
+            "readings": [{"L": 50.0, "I": 50.025, "dL": 0.000}]
+        }
+    }
+
+    res_fail = evaluator.evaluate_test("TEST-A.6", ctx, obs_fail)
+    assert res_fail.status == TestExecutionStatus.FAIL, f"Expected FAIL, got {res_fail.status}"
+
+    spec_fail = svc._calculate_endurance_test(ctx, obs_fail, {})
+    assert spec_fail["status"] == "FAIL"
+
+
+
 
 
 

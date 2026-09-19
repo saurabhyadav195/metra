@@ -215,6 +215,22 @@ class RuleEvaluator:
                 mpe_result=primary_mpe
             )
             calculations.extend(res_list)
+        elif test_id in ("TEST-A.5.4", "voltage_variations_test") or any(k in observations for k in ("low", "high", "reference", "voltage_stages", "stages")):
+            res_list = self.calculator.calculate_rule(
+                rule_id="CALC_VOLTAGE_VARIATIONS",
+                observations=observations,
+                context=context,
+                mpe_result=primary_mpe
+            )
+            calculations.extend(res_list)
+        elif test_id in ("TEST-A.6", "endurance_test", "durability_test") or any(k in observations for k in ("initial", "final", "load_cycles")):
+            res_list = self.calculator.calculate_rule(
+                rule_id="CALC_DURABILITY_ERROR",
+                observations=observations,
+                context=context,
+                mpe_result=primary_mpe
+            )
+            calculations.extend(res_list)
         else:
             for calc_id in calc_rules:
                 res_list = self.calculator.calculate_rule(
@@ -243,7 +259,7 @@ class RuleEvaluator:
                             if isinstance(row_array[step_idx], dict):
                                 row_array[step_idx][symbol] = res.output
 
-        # Handle custom repeatability, tilting, stability, or eccentricity inline calculation if calc rules array is empty
+        # Handle custom repeatability, tilting, stability, voltage variations, endurance, or eccentricity inline calculation if calc rules array is empty
         if not calculations:
             if test_id in ("TEST-A.4.11.1", "TEST-A.5.1", "tilting_test") or any(k in observations for k in ("positions", "tilt_positions")):
                 res_list = self.calculator.calculate_rule(
@@ -256,6 +272,22 @@ class RuleEvaluator:
             elif test_id in ("TEST-A.4.12", "stability_of_equilibrium_test", "stability_test") or any(k in observations for k in ("stability_readings", "time_series")):
                 res_list = self.calculator.calculate_rule(
                     rule_id="CALC_STABILITY_OF_EQUILIBRIUM",
+                    observations=observations,
+                    context=context,
+                    mpe_result=primary_mpe
+                )
+                calculations.extend(res_list)
+            elif test_id in ("TEST-A.5.4", "voltage_variations_test") or any(k in observations for k in ("low", "high", "reference", "voltage_stages", "stages")):
+                res_list = self.calculator.calculate_rule(
+                    rule_id="CALC_VOLTAGE_VARIATIONS",
+                    observations=observations,
+                    context=context,
+                    mpe_result=primary_mpe
+                )
+                calculations.extend(res_list)
+            elif test_id in ("TEST-A.6", "endurance_test", "durability_test") or any(k in observations for k in ("initial", "final", "load_cycles")):
+                res_list = self.calculator.calculate_rule(
+                    rule_id="CALC_DURABILITY_ERROR",
                     observations=observations,
                     context=context,
                     mpe_result=primary_mpe

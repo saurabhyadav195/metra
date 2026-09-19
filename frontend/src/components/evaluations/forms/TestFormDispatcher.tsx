@@ -119,9 +119,22 @@ export function TestFormDispatcher({
     return <CreepTestForm {...commonProps} />;
   }
 
-  // ── 6e. Tilting / Out-of-Level Test (TEST-A.4.11.1) ──────────────────────────
-  if (normalizedId === "TEST-A.4.11.1") {
+  // ── 6e. Tilting / Out-of-Level Test (TEST-A.5.1, TEST-A.4.11.1) ──────────────
+  if (
+    normalizedId === "TEST-A.5.1" ||
+    normalizedId === "TEST-A.4.11.1" ||
+    normalizedId.startsWith("TEST-A.5.1") ||
+    normalizedId.startsWith("TEST-A.4.11.1")
+  ) {
     return <TiltingTestForm {...commonProps} />;
+  }
+
+  // ── 6f. Endurance / Durability Test (TEST-A.6) ──────────────────────────────
+  if (
+    normalizedId === "TEST-A.6" ||
+    normalizedId.startsWith("TEST-A.6")
+  ) {
+    return <EnduranceTestForm {...commonProps} />;
   }
 
   // ── 7. Temperature Tests (TEST-A.5.3.1, TEST-A.5.3.2) ───────────────────────

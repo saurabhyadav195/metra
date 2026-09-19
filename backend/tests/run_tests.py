@@ -20,7 +20,9 @@ from tests.test_rule_engine import (
     test_zero_return_test_evaluation,
     test_calculation_decision_numeric_fallback,
     test_result_builder_and_status_verdict,
-    test_stability_of_equilibrium_evaluation
+    test_stability_of_equilibrium_evaluation,
+    test_voltage_variations_evaluation,
+    test_endurance_evaluation
 )
 
 if __name__ == "__main__":
@@ -55,4 +57,8 @@ if __name__ == "__main__":
     print(" [x] Result Builder and Status Verdict test passed")
     test_stability_of_equilibrium_evaluation()
     print(" [x] Stability of Equilibrium (TEST-A.4.12) Evaluation test passed")
-    print("\nSUCCESS: All 15 Rule Engine tests passed cleanly!")
+    test_voltage_variations_evaluation()
+    print(" [x] Voltage Variations (TEST-A.5.4) Evaluation test passed")
+    test_endurance_evaluation()
+    print(" [x] Endurance Test (TEST-A.6) Evaluation test passed")
+    print("\nSUCCESS: All 17 Rule Engine tests passed cleanly!")

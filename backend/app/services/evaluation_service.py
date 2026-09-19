@@ -12,7 +12,11 @@ from supabase import Client
 from app.deps import AuthenticatedUser
 from app.engine.models import EvaluationContext, WeighingInterval, TestResult, ApplicabilityStatus, TestExecutionStatus
 from app.engine.evaluator import RuleEvaluator, normalize_observation_payload
-from app.engine.calculator import extract_repeatability_load_sets, extract_tilting_positions, extract_zero_return_steps, extract_stability_readings
+from app.engine.calculator import (
+    extract_repeatability_load_sets, extract_tilting_positions,
+    extract_zero_return_steps, extract_stability_readings,
+    extract_voltage_variations_stages, extract_endurance_test_data
+)
 from app.engine.rule_loader import get_rule_loader
 from app.engine.result_builder import ResultBuilder
 from app.engine.mpe_engine import MPEEngine
@@ -810,6 +814,119 @@ class EvaluationService:
             ]
         }
 
+    def _calculate_voltage_variations_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Voltage variations test (TEST-A.5.4) — OIML R 76-1 §A.5.4 & §3.9.2
+        Parses nested voltage stages ('reference', 'low', 'high', etc.),
+        calculates P = I + 0.5*e - dL, E = P - L, Ec = E - E0, and checks against MPE limit.
+        PASS if all stage readings satisfy MPE limits.
+        """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        observations = normalize_observation_payload(observations)
+        info = extract_voltage_variations_stages(observations, context)
+
+        if not info:
+            return {"status": "ERROR", "message": "No valid voltage variation stage observations provided.", "rows": []}
+
+        pass_fail = info.get("result", "FAIL")
+        e1 = info.get("e1", context.e1_resolution or context.e_resolution)
+        stages = info.get("stages", [])
+
+        rows = []
+        for st in stages:
+            s_name = st["stage_name"]
+            v_val = st.get("voltage")
+            for r in st.get("readings", []):
+                rows.append({
+                    "stage": s_name,
+                    "voltage": v_val,
+                    "L": r["L"],
+                    "I": r["I"],
+                    "dL": r["dL"],
+                    "P": round(r["P"], 6),
+                    "E": round(r["E"], 6),
+                    "E0": round(r["E0"], 6),
+                    "Ec": round(r["Ec"], 6),
+                    "mpe": r["mpe"],
+                    "result": r["result"],
+                    "active_e": r["active_e"],
+                    "note": r.get("note", "")
+                })
+
+        return {
+            "status": pass_fail,
+            "e1": e1,
+            "stages": stages,
+            "rows": rows,
+            "rule_references": [
+                {"rule_id": "CALC_VOLTAGE_VARIATIONS", "section": "A.5.4 & 3.9.2", "page": 93, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "VOLTAGE_VARIATION_LIMIT", "section": "3.9.2", "page": 35, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+            ]
+        }
+
+    def _calculate_endurance_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Endurance test (TEST-A.6) — OIML R 76-1 §A.6 & §3.9.4.3
+        Extracts pre-endurance ('initial') and post-endurance ('final') weighing grids.
+        Calculates durability error = |E_final - E_initial| and checks against MPE limit.
+        PASS if durability error <= MPE(L) and |E_final| <= MPE(L).
+        """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        observations = normalize_observation_payload(observations)
+        info = extract_endurance_test_data(observations, context)
+
+        if not info:
+            return {"status": "ERROR", "message": "No valid endurance test observations provided.", "rows": []}
+
+        pass_fail = info.get("result", "FAIL")
+        c_count = info.get("cycle_count", 100000)
+        e1 = info.get("e1", context.e1_resolution or context.e_resolution)
+        parsed_rows = info.get("rows", [])
+
+        rows = []
+        for r in parsed_rows:
+            rows.append({
+                "cycles": c_count,
+                "L": r["L"],
+                "I_init": r["I_init"],
+                "dL_init": r["dL_init"],
+                "P_init": round(r["P_init"], 6),
+                "E_init": round(r["E_init"], 6),
+                "I_final": r["I_final"],
+                "dL_final": r["dL_final"],
+                "P_final": round(r["P_final"], 6),
+                "E_final": round(r["E_final"], 6),
+                "durability_error": round(r["durability_error"], 6),
+                "mpe": r["mpe"],
+                "result": r["result"],
+                "active_e": r["active_e"]
+            })
+
+        return {
+            "status": pass_fail,
+            "cycle_count": c_count,
+            "e1": e1,
+            "rows": rows,
+            "rule_references": [
+                {"rule_id": "CALC_DURABILITY_ERROR", "section": "A.6 & 3.9.4.3", "page": 94, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "ENDURANCE_LIMIT", "section": "3.9.4.3", "page": 36, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+            ]
+        }
+
     def _calculate_eccentricity_test(
         self,
         context: EvaluationContext,
@@ -1216,6 +1333,10 @@ class EvaluationService:
             specialized_result = self._calculate_zero_return_test(context, observations, test_def)
         elif test_id in ("TEST-A.4.12", "stability_of_equilibrium_test", "stability_test"):
             specialized_result = self._calculate_stability_of_equilibrium_test(context, observations, test_def)
+        elif test_id in ("TEST-A.5.4", "voltage_variations_test"):
+            specialized_result = self._calculate_voltage_variations_test(context, observations, test_def)
+        elif test_id in ("TEST-A.6", "endurance_test", "durability_test"):
+            specialized_result = self._calculate_endurance_test(context, observations, test_def)
 
         if specialized_result:
             calc_status = specialized_result.get("status", "ERROR")

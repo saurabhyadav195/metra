@@ -118,8 +118,42 @@ class InputValidator:
                 "has_tare": context.has_tare,
                 "is_electronic": context.is_electronic,
             })
+            if hasattr(context, "power_source") and context.power_source:
+                p_src = str(context.power_source).lower()
+                if "battery" in p_src:
+                    merged_inputs.setdefault("power_supply_type", "battery_non_rechargeable")
+                elif "vehicle" in p_src:
+                    merged_inputs.setdefault("power_supply_type", "vehicle_battery")
+                elif "plugin" in p_src or "adapter" in p_src:
+                    merged_inputs.setdefault("power_supply_type", "external_plugin")
+                else:
+                    merged_inputs.setdefault("power_supply_type", "ac_mains")
+
         if observations:
             merged_inputs.update(observations)
+
+        # Voltage variations test (TEST-A.5.4) metadata fallbacks & normalization
+        has_voltage_stages = any(k in merged_inputs for k in ("reference", "low", "high", "stages", "voltage_stages", "voltage_levels"))
+        if test.get("test_id") == "TEST-A.5.4" or has_voltage_stages:
+            if not merged_inputs.get("power_supply_type"):
+                merged_inputs["power_supply_type"] = "ac_mains"
+            else:
+                pst = str(merged_inputs["power_supply_type"]).lower().replace(" ", "_").replace("-", "_")
+                if pst in ("ac", "mains", "ac_mains", "ac_power"):
+                    merged_inputs["power_supply_type"] = "ac_mains"
+                elif pst in ("plugin", "adapter", "external", "external_plugin"):
+                    merged_inputs["power_supply_type"] = "external_plugin"
+                elif pst in ("battery", "battery_non_rechargeable"):
+                    merged_inputs["power_supply_type"] = "battery_non_rechargeable"
+                elif pst in ("vehicle", "vehicle_battery"):
+                    merged_inputs["power_supply_type"] = "vehicle_battery"
+
+            if not merged_inputs.get("U_nom"):
+                ref_obj = merged_inputs.get("reference") or merged_inputs.get("ref")
+                if isinstance(ref_obj, dict) and ref_obj.get("voltage"):
+                    merged_inputs["U_nom"] = ref_obj["voltage"]
+                else:
+                    merged_inputs["U_nom"] = 230
 
         for req in required_inputs:
             param_name = req.get("name")
@@ -129,8 +163,8 @@ class InputValidator:
                 # Check if optional or missing
                 if req.get("optional") is True or req.get("default") is not None:
                     continue
-                # For array-based tests (repeatability, tilting, zero return), check if steps/rows/positions/readings are provided
-                if param_name in ("test_load", "number_of_weighings", "zero_deviation", "e") and any(k in merged_inputs for k in ("steps", "rows", "load_steps", "positions", "tilt_positions", "load_sets", "repeatability_sets", "sets", "groups", "readings", "repeatability_readings")):
+                # For array or stage-based tests, check if operational observation entries exist
+                if param_name in ("test_load", "number_of_weighings", "zero_deviation", "e", "power_supply_type", "U_nom") and any(k in merged_inputs for k in ("steps", "rows", "load_steps", "positions", "tilt_positions", "load_sets", "repeatability_sets", "sets", "groups", "readings", "repeatability_readings", "reference", "low", "high", "stages", "voltage_stages", "voltage_levels")):
                     continue
                 results.append(ValidationResult(
                     rule_id="VAL_REQUIRED_INPUT_MISSING",

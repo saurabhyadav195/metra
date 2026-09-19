@@ -459,6 +459,302 @@ def extract_stability_readings(observations: Dict[str, Any], context: Evaluation
     }
 
 
+def extract_voltage_variations_stages(observations: Dict[str, Any], context: EvaluationContext) -> Dict[str, Any]:
+    """
+    Parses nested or stage-grouped observation payloads for Voltage Variations Test (TEST-A.5.4 / OIML R 76-1 §A.5.4 & §3.9.2).
+    Extracts stage readings for reference, low, and high voltage conditions (e.g., Unom, 85% Unom, 115% Unom).
+    Computes indication P = I + 0.5*e - dL, zero error E0 (if zero load), error E = P - L, corrected error Ec = E - E0,
+    and checks against MPE limit for applied load L.
+    """
+    if not isinstance(observations, dict):
+        return {}
+
+    from app.engine.mpe_engine import MPEEngine
+    mpe_engine = MPEEngine()
+
+    e1 = context.e1_resolution if (context.e1_resolution is not None and context.e1_resolution > 0) else context.e_resolution
+    if not e1 or e1 <= 0:
+        e1 = 0.001
+
+    # Stage dictionary search
+    stages_container = (
+        observations.get("stages") or
+        observations.get("voltage_stages") or
+        observations.get("voltage_levels") or
+        observations.get("indications_at_voltage_limits") or
+        observations
+    )
+
+    stage_keys = ["reference", "ref", "nominal", "nom", "low", "min", "u_min", "high", "max", "u_max"]
+    found_stages = {}
+
+    if isinstance(stages_container, dict):
+        for k, v in stages_container.items():
+            k_lower = str(k).lower()
+            if any(sk in k_lower for sk in stage_keys) or isinstance(v, (dict, list)):
+                # extract readings list from v
+                readings_list = []
+                voltage_val = None
+
+                if isinstance(v, list):
+                    readings_list = v
+                elif isinstance(v, dict):
+                    voltage_val = v.get("voltage") or v.get("U") or v.get("voltage_level")
+                    readings_list = (
+                        v.get("readings") or v.get("steps") or v.get("rows") or v.get("load_steps") or [v]
+                    )
+
+                if readings_list and isinstance(readings_list, list):
+                    found_stages[k] = {
+                        "stage_name": k,
+                        "voltage": voltage_val,
+                        "raw_readings": readings_list
+                    }
+
+    # If no stage dictionary keys found, check if observations has a flat readings/steps list
+    if not found_stages and isinstance(stages_container, list):
+        found_stages["default"] = {
+            "stage_name": "voltage_variation",
+            "voltage": None,
+            "raw_readings": stages_container
+        }
+
+    if not found_stages:
+        # Check if top-level has a readings list
+        raw_list = observations.get("readings") or observations.get("steps") or observations.get("rows")
+        if isinstance(raw_list, list) and len(raw_list) > 0:
+            found_stages["default"] = {
+                "stage_name": "voltage_variation",
+                "voltage": None,
+                "raw_readings": raw_list
+            }
+
+    if not found_stages:
+        return {}
+
+    parsed_stages = []
+    has_fail = False
+
+    # Process reference stage first if present to extract reference zero error E0 if needed
+    ref_stage_key = next((k for k in found_stages.keys() if any(sk in str(k).lower() for sk in ["ref", "nom"])), None)
+    reference_E0 = 0.0
+
+    if ref_stage_key:
+        ref_readings = found_stages[ref_stage_key]["raw_readings"]
+        for r in ref_readings:
+            if isinstance(r, dict):
+                L_val = float(r.get("L") if r.get("L") is not None else (r.get("load") if r.get("load") is not None else 0.0))
+                if abs(L_val) < 1e-9:
+                    I_val = float(r.get("I") if r.get("I") is not None else (r.get("indication") if r.get("indication") is not None else (r.get("I_net") if r.get("I_net") is not None else 0.0)))
+                    dL_val = float(r.get("dL") if r.get("dL") is not None else (r.get("changeover") if r.get("changeover") is not None else 0.0))
+                    P_val = I_val + 0.5 * float(e1) - dL_val
+                    reference_E0 = P_val - 0.0
+                    break
+
+    for stage_key, stage_info in found_stages.items():
+        stage_name = stage_info["stage_name"]
+        voltage_val = stage_info["voltage"]
+        raw_readings = stage_info["raw_readings"]
+
+        stage_readings = []
+        local_E0 = reference_E0
+        for r in raw_readings:
+            if isinstance(r, dict):
+                L_val = float(r.get("L") if r.get("L") is not None else (r.get("load") if r.get("load") is not None else 0.0))
+                if abs(L_val) < 1e-9:
+                    I_val = float(r.get("I") if r.get("I") is not None else (r.get("indication") if r.get("indication") is not None else (r.get("I_net") if r.get("I_net") is not None else 0.0)))
+                    dL_val = float(r.get("dL") if r.get("dL") is not None else (r.get("changeover") if r.get("changeover") is not None else 0.0))
+                    P_val = I_val + 0.5 * float(e1) - dL_val
+                    local_E0 = P_val - 0.0
+                    break
+
+        for idx, r in enumerate(raw_readings):
+            if not isinstance(r, dict):
+                continue
+
+            L_val = float(r.get("L") if r.get("L") is not None else (r.get("load") if r.get("load") is not None else 0.0))
+            I_val = float(r.get("I") if r.get("I") is not None else (r.get("indication") if r.get("indication") is not None else (r.get("I_net") if r.get("I_net") is not None else (r.get("I_gross") if r.get("I_gross") is not None else 0.0))))
+            dL_val = float(r.get("dL") if r.get("dL") is not None else (r.get("changeover") if r.get("changeover") is not None else 0.0))
+
+            P_val = I_val + 0.5 * float(e1) - dL_val
+            E_val = P_val - L_val
+            Ec_val = E_val - local_E0
+
+            mpe_res = mpe_engine.calculate_mpe(
+                accuracy_class=context.accuracy_class,
+                load=L_val,
+                e_resolution=context.e_resolution,
+                unit=context.unit,
+                verification_type=context.verification_type,
+                intervals=context.weighing_intervals
+            )
+            mpe_limit = abs(mpe_res.mpe_value)
+
+            pass_fail = "PASS" if (round(abs(Ec_val), 8) - round(mpe_limit, 8)) <= 1e-9 else "FAIL"
+            if pass_fail == "FAIL":
+                has_fail = True
+
+            stage_readings.append({
+                "reading_index": idx + 1,
+                "stage": stage_name,
+                "voltage": voltage_val,
+                "L": L_val,
+                "I": I_val,
+                "dL": dL_val,
+                "P": P_val,
+                "E": E_val,
+                "E0": local_E0,
+                "Ec": Ec_val,
+                "mpe": mpe_limit,
+                "mpe_result": mpe_res,
+                "active_e": float(e1),
+                "result": pass_fail,
+                "note": r.get("note", "")
+            })
+
+        parsed_stages.append({
+            "stage_key": stage_key,
+            "stage_name": stage_name,
+            "voltage": voltage_val,
+            "readings": stage_readings
+        })
+
+    if not parsed_stages:
+        return {}
+
+    overall_result = "FAIL" if has_fail else "PASS"
+
+    return {
+        "result": overall_result,
+        "e1": float(e1),
+        "stages": parsed_stages
+    }
+
+
+def extract_endurance_test_data(observations: Dict[str, Any], context: EvaluationContext) -> Dict[str, Any]:
+    """
+    Parses observation payload for Endurance Test (TEST-A.6 / OIML R 76-1 §A.6 & §3.9.4.3).
+    Extracts initial (pre-endurance) and final (post-endurance) weighing readings and cycle count.
+    For each load level:
+      P_initial = I_init + 0.5*e - dL_init
+      E_initial = P_initial - L
+      P_final = I_final + 0.5*e - dL_final
+      E_final = P_final - L
+      Durability Error = |E_final - E_initial|
+    PASS if Durability Error <= MPE(L) and |E_final| <= MPE(L).
+    """
+    if not isinstance(observations, dict):
+        return {}
+
+    from app.engine.mpe_engine import MPEEngine
+    mpe_engine = MPEEngine()
+
+    e1 = context.e1_resolution if (context.e1_resolution is not None and context.e1_resolution > 0) else context.e_resolution
+    if not e1 or e1 <= 0:
+        e1 = 0.001
+
+    initial_obj = observations.get("initial") or observations.get("initial_readings") or {}
+    final_obj = observations.get("final") or observations.get("final_readings") or {}
+
+    cycle_count = 100000
+    if isinstance(final_obj, dict) and final_obj.get("cycle_count"):
+        cycle_count = int(final_obj["cycle_count"])
+    elif isinstance(initial_obj, dict) and initial_obj.get("cycle_count"):
+        cycle_count = int(initial_obj["cycle_count"])
+    elif observations.get("load_cycles"):
+        cycle_count = int(observations["load_cycles"])
+
+    init_readings = []
+    if isinstance(initial_obj, dict):
+        init_readings = initial_obj.get("readings") or initial_obj.get("steps") or [initial_obj]
+    elif isinstance(initial_obj, list):
+        init_readings = initial_obj
+
+    final_readings = []
+    if isinstance(final_obj, dict):
+        final_readings = final_obj.get("readings") or final_obj.get("steps") or [final_obj]
+    elif isinstance(final_obj, list):
+        final_readings = final_obj
+
+    if not init_readings or not final_readings:
+        raw_list = observations.get("readings") or observations.get("steps")
+        if isinstance(raw_list, list) and len(raw_list) >= 2:
+            init_readings = [raw_list[0]]
+            final_readings = [raw_list[-1]]
+        elif isinstance(raw_list, list) and len(raw_list) == 1:
+            init_readings = raw_list
+            final_readings = raw_list
+
+    if not init_readings or not final_readings:
+        return {}
+
+    parsed_rows = []
+    has_fail = False
+
+    max_len = max(len(init_readings), len(final_readings))
+    for idx in range(max_len):
+        r_init = init_readings[idx] if idx < len(init_readings) and isinstance(init_readings[idx], dict) else {}
+        r_final = final_readings[idx] if idx < len(final_readings) and isinstance(final_readings[idx], dict) else (final_readings[0] if isinstance(final_readings[0], dict) else {})
+
+        L_val = float(r_init.get("L") if r_init.get("L") is not None else (r_init.get("load") if r_init.get("load") is not None else (r_final.get("L") if r_final.get("L") is not None else 0.0)))
+
+        I_init = float(r_init.get("I") if r_init.get("I") is not None else (r_init.get("indication") if r_init.get("indication") is not None else 0.0))
+        dL_init = float(r_init.get("dL") if r_init.get("dL") is not None else (r_init.get("changeover") if r_init.get("changeover") is not None else 0.0))
+        P_init = I_init + 0.5 * float(e1) - dL_init
+        E_init = P_init - L_val
+
+        I_final = float(r_final.get("I") if r_final.get("I") is not None else (r_final.get("indication") if r_final.get("indication") is not None else 0.0))
+        dL_final = float(r_final.get("dL") if r_final.get("dL") is not None else (r_final.get("changeover") if r_final.get("changeover") is not None else 0.0))
+        P_final = I_final + 0.5 * float(e1) - dL_final
+        E_final = P_final - L_val
+
+        durability_error = abs(E_final - E_init)
+
+        mpe_res = mpe_engine.calculate_mpe(
+            accuracy_class=context.accuracy_class,
+            load=L_val,
+            e_resolution=context.e_resolution,
+            unit=context.unit,
+            verification_type=context.verification_type,
+            intervals=context.weighing_intervals
+        )
+        mpe_limit = abs(mpe_res.mpe_value)
+
+        pass_fail = "PASS" if (round(durability_error, 8) - round(mpe_limit, 8)) <= 1e-9 and (round(abs(E_final), 8) - round(mpe_limit, 8)) <= 1e-9 else "FAIL"
+        if pass_fail == "FAIL":
+            has_fail = True
+
+        parsed_rows.append({
+            "step_index": idx + 1,
+            "L": L_val,
+            "I_init": I_init,
+            "dL_init": dL_init,
+            "P_init": P_init,
+            "E_init": E_init,
+            "I_final": I_final,
+            "dL_final": dL_final,
+            "P_final": P_final,
+            "E_final": E_final,
+            "durability_error": durability_error,
+            "mpe": mpe_limit,
+            "mpe_result": mpe_res,
+            "active_e": float(e1),
+            "result": pass_fail
+        })
+
+    if not parsed_rows:
+        return {}
+
+    overall_result = "FAIL" if has_fail else "PASS"
+
+    return {
+        "result": overall_result,
+        "cycle_count": cycle_count,
+        "e1": float(e1),
+        "rows": parsed_rows
+    }
+
+
 class CalculationEngine:
     def __init__(self):
         self.loader = get_rule_loader()
@@ -567,11 +863,116 @@ class CalculationEngine:
                     ))
                 return results
 
+            if rule_id in ("CALC_VOLTAGE_VARIATIONS", "VOLTAGE_VARIATION", "CALC_VOLTAGE_VARIATION"):
+                info = extract_voltage_variations_stages(observations, context)
+                if not info:
+                    return []
+                results: List[CalculationResult] = []
+                for stage in info.get("stages", []):
+                    s_name = stage["stage_name"]
+                    v_str = f" ({stage['voltage']}V)" if stage.get("voltage") is not None else ""
+                    for r in stage.get("readings", []):
+                        calc_id = f"CALC_VOLTAGE_{s_name}_{r['reading_index']}"
+                        results.append(CalculationResult(
+                            calculation_id=calc_id,
+                            name=f"Voltage Variation [{s_name}{v_str}] Load {r['L']} {context.unit or ''}",
+                            formula="P = I + 0.5*e - dL; E = P - L; Ec = E - E0",
+                            inputs={
+                                "stage": s_name,
+                                "voltage": r.get("voltage"),
+                                "L": r["L"],
+                                "I": r["I"],
+                                "dL": r["dL"],
+                                "P": round(r["P"], 6),
+                                "E": round(r["E"], 6),
+                                "E0": round(r["E0"], 6),
+                                "Ec": round(r["Ec"], 6),
+                                "mpe": r["mpe"],
+                                "e1": r["active_e"]
+                            },
+                            output=round(r["Ec"], 6),
+                            unit=context.unit,
+                            decision=r["result"],
+                            limit=r["mpe"],
+                            source={"standard": "OIML R 76-1", "edition": "2006 (E)", "section": "A.5.4 & 3.9.2", "page": 93}
+                        ))
+                return results
+
+            if rule_id in ("CALC_DURABILITY_ERROR", "CALC_ENDURANCE_TEST", "ENDURANCE_LIMIT"):
+                info = extract_endurance_test_data(observations, context)
+                if not info:
+                    return []
+                results: List[CalculationResult] = []
+                c_count = info.get("cycle_count", 100000)
+                for r in info.get("rows", []):
+                    calc_id = f"CALC_ENDURANCE_STEP_{r['step_index']}"
+                    results.append(CalculationResult(
+                        calculation_id=calc_id,
+                        name=f"Endurance Durability Error [{c_count} cycles] Load {r['L']} {context.unit or ''}",
+                        formula="Durability Error = abs(E_final - E_initial); E = P - L",
+                        inputs={
+                            "cycles": c_count,
+                            "L": r["L"],
+                            "I_init": r["I_init"],
+                            "dL_init": r["dL_init"],
+                            "P_init": round(r["P_init"], 6),
+                            "E_init": round(r["E_init"], 6),
+                            "I_final": r["I_final"],
+                            "dL_final": r["dL_final"],
+                            "P_final": round(r["P_final"], 6),
+                            "E_final": round(r["E_final"], 6),
+                            "durability_error": round(r["durability_error"], 6),
+                            "mpe": r["mpe"],
+                            "e1": r["active_e"]
+                        },
+                        output=round(r["durability_error"], 6),
+                        unit=context.unit,
+                        decision=r["result"],
+                        limit=r["mpe"],
+                        source={"standard": "OIML R 76-1", "edition": "2006 (E)", "section": "A.6 & 3.9.4.3", "page": 94}
+                    ))
+                return results
+
             return []
 
         calc_name = rule.get("name", rule_id)
         formula_expr = rule.get("formula_expression", "")
         source = rule.get("source", {})
+
+        if rule_id in ("CALC_DURABILITY_ERROR", "CALC_ENDURANCE_TEST", "ENDURANCE_LIMIT"):
+            info = extract_endurance_test_data(observations, context)
+            if not info:
+                return []
+            results: List[CalculationResult] = []
+            c_count = info.get("cycle_count", 100000)
+            for r in info.get("rows", []):
+                calc_id = f"CALC_ENDURANCE_STEP_{r['step_index']}"
+                results.append(CalculationResult(
+                    calculation_id=calc_id,
+                    name=f"Endurance Durability Error [{c_count} cycles] Load {r['L']} {context.unit or ''}",
+                    formula="Durability Error = abs(E_final - E_initial); E = P - L",
+                    inputs={
+                        "cycles": c_count,
+                        "L": r["L"],
+                        "I_init": r["I_init"],
+                        "dL_init": r["dL_init"],
+                        "P_init": round(r["P_init"], 6),
+                        "E_init": round(r["E_init"], 6),
+                        "I_final": r["I_final"],
+                        "dL_final": r["dL_final"],
+                        "P_final": round(r["P_final"], 6),
+                        "E_final": round(r["E_final"], 6),
+                        "durability_error": round(r["durability_error"], 6),
+                        "mpe": r["mpe"],
+                        "e1": r["active_e"]
+                    },
+                    output=round(r["durability_error"], 6),
+                    unit=context.unit,
+                    decision=r["result"],
+                    limit=r["mpe"],
+                    source=source or {"standard": "OIML R 76-1", "edition": "2006 (E)", "section": "A.6 & 3.9.4.3", "page": 94}
+                ))
+            return results
 
         # Specialized calculation rule: Zero Return Test calculation
         if rule_id in ("CALC_ZERO_RETURN", "ZERO_RETURN_LIMIT"):
