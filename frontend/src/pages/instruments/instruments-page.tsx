@@ -187,7 +187,7 @@ export default function InstrumentsPage() {
                       to={`/app/instruments/${instrument.id}`}
                       className="font-medium text-foreground hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     >
-                      {instrument.model_designation || (instrument as any).model || "Unnamed Model"}
+                      {instrument.model || "Unnamed Model"}
                     </Link>
                   </TableCell>
                   <TableCell className="text-muted-foreground">

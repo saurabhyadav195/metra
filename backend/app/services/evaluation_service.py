@@ -10,8 +10,9 @@ from fastapi import HTTPException, status
 from supabase import Client
 
 from app.deps import AuthenticatedUser
-from app.engine.models import EvaluationContext, TestResult, ApplicabilityStatus, TestExecutionStatus
-from app.engine.evaluator import RuleEvaluator
+from app.engine.models import EvaluationContext, WeighingInterval, TestResult, ApplicabilityStatus, TestExecutionStatus
+from app.engine.evaluator import RuleEvaluator, normalize_observation_payload
+from app.engine.calculator import extract_repeatability_load_sets, extract_tilting_positions, extract_zero_return_steps, extract_stability_readings
 from app.engine.rule_loader import get_rule_loader
 from app.engine.result_builder import ResultBuilder
 from app.engine.mpe_engine import MPEEngine
@@ -31,11 +32,23 @@ class EvaluationService:
         e = float(inst.get("verification_scale_interval_e") or inst.get("verification_scale_interval") or inst.get("e_resolution") or 0.05)
         d = float(inst.get("scale_interval_d") or inst.get("actual_scale_interval") or inst.get("d_resolution") or e)
 
+        # Parse multi-interval data if present (OIML T.3.2.6 / T.3.2.7)
+        raw_intervals = inst.get("weighing_intervals")
+        weighing_intervals: Optional[List[WeighingInterval]] = None
+        e1_resolution: Optional[float] = None
+        if raw_intervals and isinstance(raw_intervals, list) and len(raw_intervals) > 0:
+            try:
+                parsed = [WeighingInterval(max_load=float(iv["max_load"]), e=float(iv["e"])) for iv in raw_intervals]
+                weighing_intervals = sorted(parsed, key=lambda iv: iv.max_load)
+                e1_resolution = weighing_intervals[0].e  # Smallest e — used for fixed-e₁ limits
+            except (KeyError, TypeError, ValueError):
+                weighing_intervals = None  # Gracefully ignore malformed data
+
         return EvaluationContext(
             instrument_id=inst["id"],
             serial_number=inst.get("serial_number"),
             manufacturer=inst.get("manufacturer"),
-            model=inst.get("model_designation") or inst.get("model"),
+            model=inst.get("model"),
             accuracy_class=inst.get("accuracy_class", "III"),
             max_capacity=capacity,
             min_capacity=float(inst.get("min_capacity") or 0.0),
@@ -46,8 +59,15 @@ class EvaluationService:
             instrument_type=inst.get("instrument_type", "non_automatic"),
             power_source=inst.get("power_source", "mains"),
             has_tare=inst.get("has_tare", True),
-            is_electronic=inst.get("is_electronic", True)
+            is_electronic=inst.get("is_electronic", True),
+            weighing_intervals=weighing_intervals,
+            e1_resolution=e1_resolution
         )
+
+    @staticmethod
+    def _resolve_e_for_load(load: float, context: EvaluationContext) -> float:
+        """Returns the active e_i for a given load, respecting multi-interval definitions."""
+        return MPEEngine._resolve_active_e(load, context.weighing_intervals, context.e_resolution)
 
     def _safe_insert(self, table_name: str, payload: dict) -> dict:
         import re
@@ -377,6 +397,9 @@ class EvaluationService:
         caller: AuthenticatedUser
     ) -> dict:
         """Saves or updates observations for a test in an evaluation."""
+        # Normalize observation payload (maps I_net / I_gross -> I)
+        observations = normalize_observation_payload(observations)
+
         # Check evaluation & test ownership
         test_res = (
             self.client.table("evaluation_test_results")
@@ -423,19 +446,28 @@ class EvaluationService:
         test_def: dict
     ) -> Dict[str, Any]:
         """
-        Weighing test (TEST-A.4.4.1) — OIML R 76-1 §A.4.4.3
+        Weighing test (TEST-A.4.4.1 / TEST-A.4.6.1) — OIML R 76-1 §A.4.4.3
         For each load step {L, I, dL}:
-            P = I + 0.5*e - dL   (indication prior to rounding, CALC_ERROR_CHANGEOVER)
-            E = P - L            (uncorrected error)
-            Ec = E - E0          (corrected error, CALC_CORRECTED_ERROR)
-        PASS if |Ec| <= MPE for each load step.
-        MPE determined by MPE_INIT rule (Table 6).
+            P = I + 0.5*e_i - dL  (e_i = active interval e for load L)
+            E = P - L             (uncorrected error)
+            Ec = E - E0           (corrected error)
+        PASS if |Ec| <= MPE(L) for each load step.
+        MPE and e_i both resolved per-interval for multi-interval instruments.
         """
         if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
             observations = observations["observations"]
 
-        load_steps = observations.get("load_steps") or observations.get("readings") or observations.get("rows") or []
-        e = context.e_resolution
+        observations = normalize_observation_payload(observations)
+
+        load_steps = (
+            observations.get("load_steps") or
+            observations.get("net_test_steps") or
+            observations.get("steps") or
+            observations.get("readings") or
+            observations.get("rows") or
+            observations.get("test_load_steps") or
+            []
+        )
         verification_type = observations.get("verification_type", "initial")
 
         if not load_steps:
@@ -446,18 +478,27 @@ class EvaluationService:
         for step in load_steps:
             if isinstance(step, dict):
                 L_val = float(step.get("L") if step.get("L") is not None else (step.get("load") if step.get("load") is not None else step.get("applied_load", 0.0)))
-                I_val = float(step.get("I") if step.get("I") is not None else (step.get("indication") if step.get("indication") is not None else step.get("indicated_value", 0.0)))
+                I_val = float(
+                    step.get("I") if step.get("I") is not None else (
+                        step.get("I_net") if step.get("I_net") is not None else (
+                            step.get("I_gross") if step.get("I_gross") is not None else (
+                                step.get("indication") if step.get("indication") is not None else step.get("indicated_value", 0.0)
+                            )
+                        )
+                    )
+                )
                 dL_val = float(step.get("dL", 0.0))
                 norm_steps.append({"L": L_val, "I": I_val, "dL": dL_val})
 
-        # E0 — error at zero (first row if L ≈ 0, else 0)
+        # E0 — error at zero; use e for the first load step (active e_i at L≈0 = e₁)
         E0 = 0.0
-        if norm_steps and norm_steps[0]["L"] < e:
+        e1 = context.e1_resolution or context.e_resolution  # e₁ for zero step
+        if norm_steps and norm_steps[0]["L"] < e1:
             step0 = norm_steps[0]
             I0 = step0["I"]
             dL0 = step0["dL"]
             L0 = step0["L"]
-            E0 = (I0 + 0.5 * e - dL0) - L0
+            E0 = (I0 + 0.5 * e1 - dL0) - L0
 
         rows = []
         any_fail = False
@@ -467,20 +508,24 @@ class EvaluationService:
             I = step["I"]
             dL = step["dL"]
 
-            # CALC_ERROR_CHANGEOVER (§A.4.4.3)
-            P = I + (0.5 * e if dL > 0 else 0.0) - dL
+            # Resolve active e_i for this load step (multi-interval aware)
+            active_e = self._resolve_e_for_load(L, context)
+
+            # CALC_ERROR_CHANGEOVER (§A.4.4.3) — uses active e_i
+            P = I + (0.5 * active_e if dL > 0 else 0.0) - dL
             E = P - L if dL > 0 else (I - L)
 
             # CALC_CORRECTED_ERROR
             Ec = E - E0
 
-            # MPE_INIT — Table 6 — from mpe_rules.json
+            # MPE_INIT — Table 6 — multi-interval aware
             mpe_result = self.mpe_engine.calculate_mpe(
                 accuracy_class=context.accuracy_class,
                 load=L,
-                e_resolution=e,
+                e_resolution=context.e_resolution,
                 unit=context.unit,
-                verification_type=verification_type
+                verification_type=verification_type,
+                intervals=context.weighing_intervals
             )
 
             pass_fail = "PASS" if abs(Ec) <= mpe_result.mpe_value else "FAIL"
@@ -495,6 +540,7 @@ class EvaluationService:
                 "E": round(E, 6),
                 "E0": round(E0, 6),
                 "Ec": round(Ec, 6),
+                "active_e": active_e,
                 "mpe_e": mpe_result.mpe_e,
                 "mpe_value": round(mpe_result.mpe_value, 6),
                 "rule_id": mpe_result.rule_id,
@@ -506,7 +552,9 @@ class EvaluationService:
         return {
             "status": overall,
             "E0": round(E0, 6),
-            "e": e,
+            "e": context.e_resolution,
+            "e1": e1,
+            "multi_interval": context.weighing_intervals is not None,
             "verification_type": verification_type,
             "rows": rows,
             "rule_references": [
@@ -523,76 +571,242 @@ class EvaluationService:
     ) -> Dict[str, Any]:
         """
         Repeatability test (TEST-A.4.10) — OIML R 76-1 §A.4.10 & §3.6.1
-        Range = I_max - I_min
-        PASS if Range <= |MPE| for that load.
-        Limit from REPEATABILITY_LIMIT rule (mpe_rules.json §3.6.1).
+        Supports multiple independent load sets (e.g. Set 1 at ~50% Max, Set 2 at ~Max).
+        For each load set:
+            Range = I_max - I_min
+            PASS if Range <= |MPE(L)| for that specific test load.
+        MPE and active e resolved per-interval for multi-interval instruments.
         """
-        test_load = float(observations.get("test_load", context.max_capacity * 0.5))
-        readings = observations.get("readings", [])
+        load_groups = extract_repeatability_load_sets(observations, context)
+        if not load_groups:
+            return {"status": "ERROR", "message": "At least 2 valid numeric readings required per load set.", "load_sets": []}
 
-        e = context.e_resolution
-        readings_f = []
+        sets_result = []
+        any_fail = False
 
-        for r in readings:
-            if isinstance(r, dict):
-                ind = r.get("indication") if r.get("indication") is not None else (
-                    r.get("I") if r.get("I") is not None else (
-                        r.get("val") if r.get("val") is not None else (
-                            r.get("value") if r.get("value") is not None else (
-                                r.get("reading")
-                            )
-                        )
-                    )
-                )
-                if ind is not None and str(ind).strip() != "":
-                    try:
-                        I_val = float(ind)
-                        dL_raw = r.get("dL")
-                        if dL_raw is not None and str(dL_raw).strip() != "":
-                            P_val = I_val + 0.5 * e - float(dL_raw)
-                            readings_f.append(P_val)
-                        else:
-                            readings_f.append(I_val)
-                    except (ValueError, TypeError):
-                        pass
-            elif r is not None and str(r).strip() != "":
-                try:
-                    readings_f.append(float(r))
-                except (ValueError, TypeError):
-                    pass
+        for g in load_groups:
+            load_val = g["test_load"]
+            readings_f = g["readings"]
+            if len(readings_f) < 2:
+                sets_result.append({
+                    "set_index": g["set_index"],
+                    "test_load": load_val,
+                    "status": "ERROR",
+                    "message": "At least 2 valid readings required for this load set."
+                })
+                any_fail = True
+                continue
 
-        if not readings_f or len(readings_f) < 2:
-            return {"status": "ERROR", "message": "At least 2 valid numeric readings required.", "readings": []}
+            active_e = g["active_e"]
+            I_max = max(readings_f)
+            I_min = min(readings_f)
+            range_val = I_max - I_min
+            mpe_result = g["mpe_result"]
 
-        I_max = max(readings_f)
-        I_min = min(readings_f)
-        range_val = I_max - I_min
+            pass_fail = "PASS" if range_val <= abs(mpe_result.mpe_value) else "FAIL"
+            if pass_fail == "FAIL":
+                any_fail = True
 
-        # MPE for test load — REPEATABILITY_LIMIT says Range <= |mpe| for that load
-        mpe_result = self.mpe_engine.calculate_mpe(
-            accuracy_class=context.accuracy_class,
-            load=test_load,
-            e_resolution=context.e_resolution,
-            unit=context.unit,
-            verification_type="initial"
-        )
+            sets_result.append({
+                "set_index": g["set_index"],
+                "test_load": load_val,
+                "active_e": active_e,
+                "readings": readings_f,
+                "I_max": round(I_max, 6),
+                "I_min": round(I_min, 6),
+                "range": round(range_val, 6),
+                "mpe_value": round(mpe_result.mpe_value, 6),
+                "mpe_e": mpe_result.mpe_e,
+                "n_readings": len(readings_f),
+                "result": pass_fail
+            })
 
-        # CALC_REPEATABILITY_RANGE: Range <= |mpe|
-        pass_fail = "PASS" if range_val <= abs(mpe_result.mpe_value) else "FAIL"
+        overall = "FAIL" if any_fail else ("PASS" if sets_result else "INCOMPLETE")
+        first_set = sets_result[0] if sets_result else {}
+
+        return {
+            "status": overall,
+            "test_load": first_set.get("test_load"),
+            "active_e": first_set.get("active_e"),
+            "readings": first_set.get("readings"),
+            "I_max": first_set.get("I_max"),
+            "I_min": first_set.get("I_min"),
+            "range": first_set.get("range"),
+            "mpe_value": first_set.get("mpe_value"),
+            "mpe_e": first_set.get("mpe_e"),
+            "n_readings": first_set.get("n_readings"),
+            "load_sets": sets_result,
+            "rows": sets_result,
+            "rule_references": [
+                {"rule_id": "CALC_REPEATABILITY_RANGE", "section": "3.6.1 & A.4.10", "page": 31, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "REPEATABILITY_LIMIT", "section": "3.6.1", "page": 33, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+            ]
+        }
+
+    def _calculate_tilting_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Tilting test (TEST-A.4.11.1) — OIML R 76-1 §A.5.1 & §3.9.1
+        Computes position-wise unrounded indications P_v, zero-corrected indications P_v_0,
+        and corrected errors Ec for each position entry in positions array.
+        PASS if |Ec| <= MPE(L) for each position.
+        """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        observations = normalize_observation_payload(observations)
+        positions = extract_tilting_positions(observations, context)
+
+        if not positions:
+            return {"status": "ERROR", "message": "No valid tilt position observations provided.", "positions": []}
+
+        rows = []
+        any_fail = False
+
+        for p in positions:
+            if p["result"] == "FAIL":
+                any_fail = True
+
+            rows.append({
+                "step_index": p["step_index"],
+                "position_label": p["position_label"],
+                "tilt_angle": p["tilt_angle"],
+                "L": p["L"],
+                "I": p["I"],
+                "dL": p["dL"],
+                "P_v": round(p["P_v"], 6),
+                "P_v_0": round(p["P_v_0"], 6),
+                "E0": round(p["E0"], 6),
+                "Ec": round(p["Ec"], 6),
+                "active_e": p["active_e"],
+                "mpe_e": p["mpe_result"].mpe_e,
+                "mpe_value": round(p["mpe_result"].mpe_value, 6),
+                "rule_id": p["mpe_result"].rule_id,
+                "result": p["result"]
+            })
+
+        overall = "FAIL" if any_fail else ("PASS" if rows else "INCOMPLETE")
+        E0_val = positions[0]["E0"] if positions else 0.0
+
+        return {
+            "status": overall,
+            "E0": round(E0_val, 6),
+            "positions": rows,
+            "rows": rows,
+            "rule_references": [
+                {"rule_id": "CALC_TILTING_TEST", "section": "A.5.1 & 3.9.1", "page": 95, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "TILTING_LIMIT", "section": "3.9.1", "page": 35, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+            ]
+        }
+
+    def _calculate_zero_return_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Zero return test (TEST-A.4.11.2) — OIML R 76-1 §A.4.11.2 & §3.9.4.2
+        Computes step-wise unrounded indication P = I + 0.5*e - dL,
+        zero-return variation delta_P = |P_end - P_start|, and checks against limit = 0.5 * e1.
+        PASS if delta_P <= 0.5 * e1.
+        """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        observations = normalize_observation_payload(observations)
+        info = extract_zero_return_steps(observations, context)
+
+        if not info:
+            return {"status": "ERROR", "message": "No valid zero-return observations provided.", "rows": []}
+
+        pass_fail = info.get("result", "FAIL")
+        delta_P = info.get("delta_P", 0.0)
+        limit_val = info.get("allowed_limit", 0.0)
+        e1 = info.get("e1", context.e1_resolution or context.e_resolution)
+        steps = info.get("steps", [])
+
+        rows = []
+        for s in steps:
+            rows.append({
+                "step_index": s["step_index"],
+                "L": s["L"],
+                "I": s["I"],
+                "dL": s["dL"],
+                "P": round(s["P"], 6),
+                "active_e": s["active_e"],
+                "note": s.get("note", "")
+            })
 
         return {
             "status": pass_fail,
-            "test_load": test_load,
-            "readings": readings_f,
-            "I_max": round(I_max, 6),
-            "I_min": round(I_min, 6),
-            "range": round(range_val, 6),
-            "mpe_value": round(mpe_result.mpe_value, 6),
-            "mpe_e": mpe_result.mpe_e,
-            "n_readings": len(readings_f),
+            "P_start": round(info.get("P_start", 0.0), 6),
+            "P_end": round(info.get("P_end", 0.0), 6),
+            "delta_P": delta_P,
+            "allowed_limit": limit_val,
+            "e1": e1,
+            "steps": steps,
+            "rows": rows,
             "rule_references": [
-                {"rule_id": "CALC_REPEATABILITY_RANGE", "section": "3.6.1 & A.4.10", "page": 31, "standard": "OIML R 76-1", "edition": "2006 (E)"},
-                {"rule_id": "REPEATABILITY_LIMIT", "section": "3.6.1", "page": 31, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+                {"rule_id": "CALC_ZERO_RETURN", "section": "A.4.11.2 & 3.9.4.2", "page": 93, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "ZERO_RETURN_LIMIT", "section": "3.9.4.2", "page": 36, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+            ]
+        }
+
+    def _calculate_stability_of_equilibrium_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Stability of equilibrium test (TEST-A.4.12) — OIML R 76-1 §A.4.12 & §4.4.2
+        Computes reading-wise unrounded indication P = I + 0.5*e - dL,
+        error E = P - L (or E0 = P - 0), and checks against limit = 0.25 * e1.
+        PASS if all readings have |E| <= 0.25 * e1.
+        """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        observations = normalize_observation_payload(observations)
+        info = extract_stability_readings(observations, context)
+
+        if not info:
+            return {"status": "ERROR", "message": "No valid stability of equilibrium observations provided.", "rows": []}
+
+        pass_fail = info.get("result", "FAIL")
+        e1 = info.get("e1", context.e1_resolution or context.e_resolution)
+        limit_val = info.get("allowed_limit", 0.25 * (e1 or 0.001))
+        readings = info.get("readings", [])
+
+        rows = []
+        for r in readings:
+            rows.append({
+                "time_label": r.get("time_label", f"Reading {r['reading_index']}"),
+                "L": r["L"],
+                "I": r["I"],
+                "dL": r["dL"],
+                "P": round(r["P"], 6),
+                "error": round(r["error"], 6),
+                "limit": limit_val,
+                "result": r["result"],
+                "active_e": r["active_e"],
+                "note": r.get("note", "")
+            })
+
+        return {
+            "status": pass_fail,
+            "allowed_limit": limit_val,
+            "e1": e1,
+            "readings": readings,
+            "rows": rows,
+            "rule_references": [
+                {"rule_id": "CALC_STABILITY_OF_EQUILIBRIUM", "section": "A.4.12 & 4.4.2", "page": 93, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "STABILITY_LIMIT", "section": "4.4.2 & A.4.12", "page": 40, "standard": "OIML R 76-1", "edition": "2006 (E)"}
             ]
         }
 
@@ -604,15 +818,14 @@ class EvaluationService:
         """
         Eccentricity test (TEST-A.4.7) — OIML R 76-1 §A.4.7 & §3.6.2
         For each load position:
-            E = P - L   (using changeover method)
+            E = P - L   (using changeover method; e_i resolved per load)
             Ec = E - E0
-        PASS if |Ec| <= MPE for applied test load (ECCENTRICITY_LIMIT §3.6.2).
+        PASS if |Ec| <= MPE(L) for applied test load.
         """
         if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
             observations = observations["observations"]
 
         positions = observations.get("positions") or observations.get("load_steps") or observations.get("readings") or []
-        e = context.e_resolution
         E0 = float(observations.get("E0", 0.0))
 
         if not positions:
@@ -627,18 +840,22 @@ class EvaluationService:
             I = float(pos.get("I") if pos.get("I") is not None else (pos.get("indication") if pos.get("indication") is not None else pos.get("indicated_value", 0.0)))
             dL = float(pos.get("dL", 0.0))
 
-            # CALC_ERROR_CHANGEOVER
-            P = I + (0.5 * e if dL > 0 else 0.0) - dL
+            # Resolve active e_i for this load (multi-interval aware)
+            active_e = self._resolve_e_for_load(L, context)
+
+            # CALC_ERROR_CHANGEOVER — uses active e_i
+            P = I + (0.5 * active_e if dL > 0 else 0.0) - dL
             E = P - L if dL > 0 else (I - L)
             Ec = E - E0
 
-            # MPE for this load — ECCENTRICITY_LIMIT says error <= MPE for load
+            # MPE for this load — multi-interval aware
             mpe_result = self.mpe_engine.calculate_mpe(
                 accuracy_class=context.accuracy_class,
                 load=L,
-                e_resolution=e,
+                e_resolution=context.e_resolution,
                 unit=context.unit,
-                verification_type="initial"
+                verification_type="initial",
+                intervals=context.weighing_intervals
             )
 
             pass_fail = "PASS" if abs(Ec) <= mpe_result.mpe_value else "FAIL"
@@ -654,6 +871,7 @@ class EvaluationService:
                 "E": round(E, 6),
                 "E0": round(E0, 6),
                 "Ec": round(Ec, 6),
+                "active_e": active_e,
                 "mpe_value": round(mpe_result.mpe_value, 6),
                 "mpe_e": mpe_result.mpe_e,
                 "result": pass_fail
@@ -663,7 +881,8 @@ class EvaluationService:
         return {
             "status": overall,
             "E0": round(E0, 6),
-            "e": e,
+            "e": context.e_resolution,
+            "multi_interval": context.weighing_intervals is not None,
             "rows": rows,
             "rule_references": [
                 {"rule_id": "CALC_ERROR_CHANGEOVER", "section": "A.4.7", "page": 90, "standard": "OIML R 76-1", "edition": "2006 (E)"},
@@ -682,9 +901,18 @@ class EvaluationService:
         PASS if indication changes from I to I+d after adding 1.4d extra load.
         DISCRIMINATION_CRITERIA: indication_after_1_4d == initial_indication + d
         """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
         d = context.d_resolution
         extra_load = round(1.4 * d, 8)
-        points = observations.get("test_points", [])
+        points = (
+            observations.get("test_points") or
+            observations.get("rows") or
+            observations.get("readings") or
+            observations.get("load_steps") or
+            []
+        )
 
         if not points:
             return {"status": "ERROR", "message": "No test points provided.", "rows": []}
@@ -694,7 +922,7 @@ class EvaluationService:
 
         for pt in points:
             load_label = pt.get("load_label", "Unknown")
-            L = float(pt.get("L", 0.0))
+            L = float(pt.get("L") if pt.get("L") is not None else (pt.get("load") if pt.get("load") is not None else pt.get("test_load", 0.0)))
             I_before = float(pt.get("I_before", 0.0))
             I_after = float(pt.get("I_after", 0.0))
 
@@ -728,6 +956,120 @@ class EvaluationService:
             ]
         }
 
+    def _calculate_zero_setting_accuracy_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Accuracy of zero-setting test calculator (TEST-A.4.2.3) — OIML R 76-1 §A.4.2.3 & §4.5.2
+
+        Calculates unrounded true error prior to rounding:
+            E = I + 0.5 * e1 - dL - L
+
+        MPE limit:
+            MPE = ±0.25 * e1
+        """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        steps = observations.get("steps") or observations.get("rows") or observations.get("load_steps") or []
+        first_step = steps[0] if steps and isinstance(steps[0], dict) else {}
+
+        # 1. Extract applied load L without hardcoding L=0
+        L_val = observations.get("L")
+        if L_val is None:
+            L_val = observations.get("load")
+        if L_val is None:
+            L_val = observations.get("applied_load")
+        if L_val is None:
+            L_val = observations.get("test_load")
+        if L_val is None and first_step:
+            L_val = first_step.get("L") if first_step.get("L") is not None else first_step.get("load")
+        L = float(L_val) if L_val is not None else 0.0
+
+        # 2. Extract indicated value I
+        I_val = observations.get("I")
+        if I_val is None:
+            I_val = observations.get("indication")
+        if I_val is None:
+            I_val = observations.get("indicated_value")
+        if I_val is None:
+            I_val = observations.get("initial_indication")
+        if I_val is None and first_step:
+            I_val = first_step.get("I") if first_step.get("I") is not None else first_step.get("indication")
+        I = float(I_val) if I_val is not None else 0.0
+
+        # 3. Extract changeover dL
+        dL_val = observations.get("dL")
+        if dL_val is None:
+            dL_val = observations.get("changeover")
+        if dL_val is None:
+            dL_val = observations.get("additional_weight")
+        if dL_val is None:
+            dL_val = observations.get("additional_weight_changeover")
+        if dL_val is None and first_step:
+            dL_val = first_step.get("dL")
+        dL = float(dL_val) if dL_val is not None else 0.0
+
+        # Scale interval e1 (OIML §4.5.2)
+        e1 = context.e1_resolution or context.e_resolution
+
+        # Unrounded true error calculation: E = I + 0.5*e1 - dL - L
+        P = I + 0.5 * e1 - dL
+        E = P - L
+
+        # MPE limit calculation: ±0.25 * e1 (OIML §4.5.2)
+        mpe_e = 0.25
+        mpe_value = 0.25 * e1
+
+        passed = abs(E) <= mpe_value
+
+        return {
+            "status": "PASS" if passed else "FAIL",
+            "test_id": "TEST-A.4.2.3",
+            "test_name": test_def.get("test_name", "Accuracy of zero-setting"),
+            "L": L,
+            "I": I,
+            "dL": dL,
+            "e": context.e_resolution,
+            "e1": e1,
+            "P": P,
+            "E": E,
+            "mpe_e": mpe_e,
+            "mpe_value": mpe_value,
+            "formula": "E = I + 0.5*e1 - dL - L",
+            "rows": [
+                {
+                    "L": L,
+                    "I": I,
+                    "dL": dL,
+                    "P": P,
+                    "E": E,
+                    "E0": E,
+                    "Ec": E,
+                    "active_e": e1,
+                    "mpe_value": mpe_value,
+                    "mpe_e": mpe_e,
+                    "formula": "E = I + 0.5*e1 - dL - L",
+                    "limit_val": mpe_value,
+                    "rule_id": "ZERO_SETTING_ACCURACY",
+                    "section": "A.4.2.3 & 4.5.2",
+                    "result": "PASS" if passed else "FAIL"
+                }
+            ],
+            "rule_references": [
+                {
+                    "rule_id": "ZERO_SETTING_ACCURACY",
+                    "section": "A.4.2.3 & 4.5.2",
+                    "page": 87,
+                    "standard": "OIML R 76-1",
+                    "edition": "2006 (E)"
+                }
+            ]
+        }
+
     def _calculate_zero_setting_test(
         self,
         context: EvaluationContext,
@@ -735,18 +1077,30 @@ class EvaluationService:
         test_def: dict
     ) -> Dict[str, Any]:
         """
-        Zero setting test calculator (TEST-A.4.2.1 & TEST-A.4.2.3) — OIML R 76-1 §A.4.2 & §4.5.1
-        Extracts Max capacity (e.g. 300 kg) and e from registered instrument context.
-        Calculates zero-setting range compliance and zero accuracy.
+        Zero setting range test calculator (TEST-A.4.2.1) — OIML R 76-1 §A.4.2.1 & §4.5.1
         """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
         Max = context.max_capacity
-        e = context.e_resolution
+        e1 = context.e1_resolution or context.e_resolution
         zero_type = observations.get("zero_setting_type", "initial")
 
         pos_pct = float(observations.get("positive_range") if observations.get("positive_range") is not None else observations.get("positive_limit_percent", 4.0))
         neg_pct = float(observations.get("negative_range") if observations.get("negative_range") is not None else observations.get("negative_limit_percent", 1.0))
-        dL = float(observations.get("dL") if observations.get("dL") is not None else observations.get("additional_weight_changeover", 0.02))
-        initial_ind = float(observations.get("initial_indication") if observations.get("initial_indication") is not None else observations.get("initial_no_load_indication", 0.0))
+
+        steps = observations.get("steps") or observations.get("rows") or observations.get("load_steps") or []
+        first_step = steps[0] if steps and isinstance(steps[0], dict) else {}
+
+        dL_val = observations.get("dL") if observations.get("dL") is not None else observations.get("additional_weight_changeover")
+        if dL_val is None:
+            dL_val = first_step.get("dL", 0.02)
+        dL = float(dL_val)
+
+        ind_val = observations.get("initial_indication") if observations.get("initial_indication") is not None else observations.get("initial_no_load_indication")
+        if ind_val is None:
+            ind_val = first_step.get("I", first_step.get("indication", observations.get("E0", 0.0)))
+        initial_ind = float(ind_val)
 
         total_pct = pos_pct + neg_pct
         max_allowed_pct = 20.0 if zero_type == "initial" else 4.0
@@ -757,16 +1111,14 @@ class EvaluationService:
 
         passed = (total_pct <= max_allowed_pct) or (pos_pct <= max_allowed_pct and neg_pct <= max_allowed_pct)
 
-        # Zero accuracy error if dL is provided
-        E0 = round((initial_ind + 0.5 * e - dL) if dL > 0 else initial_ind, 6)
-        accuracy_passed = abs(E0) <= 0.25 * e
-
-        overall_pass = passed and accuracy_passed
+        E0 = round((initial_ind + 0.5 * e1 - dL) if dL > 0 else initial_ind, 6)
 
         return {
-            "status": "PASS" if overall_pass else "FAIL",
+            "status": "PASS" if passed else "FAIL",
             "Max": Max,
-            "e": e,
+            "e": context.e_resolution,
+            "e1": e1,
+            "multi_interval": context.weighing_intervals is not None,
             "zero_setting_type": zero_type,
             "positive_range_percent": pos_pct,
             "negative_range_percent": neg_pct,
@@ -781,18 +1133,18 @@ class EvaluationService:
                     "L": 0,
                     "I": initial_ind,
                     "dL": dL,
-                    "P": round(initial_ind + (0.5 * e if dL > 0 else 0.0) - dL, 6),
+                    "P": round(initial_ind + (0.5 * e1 if dL > 0 else 0.0) - dL, 6),
                     "E": E0,
                     "E0": E0,
                     "Ec": E0,
+                    "active_e": e1,
                     "mpe_value": round(max_allowed_kg, 4),
                     "mpe_e": round(max_allowed_pct, 1),
-                    "result": "PASS" if overall_pass else "FAIL"
+                    "result": "PASS" if passed else "FAIL"
                 }
             ],
             "rule_references": [
-                {"rule_id": "VAL_ZERO_SETTING_RANGE", "section": "4.5.1 & A.4.2.1", "page": 48, "standard": "OIML R 76-1", "edition": "2006 (E)"},
-                {"rule_id": "ZERO_SETTING_ACCURACY", "section": "A.4.2.3", "page": 87, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+                {"rule_id": "VAL_ZERO_SETTING_RANGE", "section": "4.5.1 & A.4.2.1", "page": 48, "standard": "OIML R 76-1", "edition": "2006 (E)"}
             ]
         }
 
@@ -823,6 +1175,9 @@ class EvaluationService:
             .execute()
         )
         observations = obs_res.data[0]["observations"] if obs_res.data else {}
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+        observations = normalize_observation_payload(observations)
 
         test_def = self.loader.get_test(test_id) or {}
 
@@ -851,8 +1206,16 @@ class EvaluationService:
             specialized_result = self._calculate_discrimination_test(context, observations)
         elif test_id in ("TEST-A.4.6.1", "tare_test"):
             specialized_result = self._calculate_weighing_test(context, observations, test_def)
-        elif test_id in ("TEST-A.4.2.1", "TEST-A.4.2.3", "zero_setting_test"):
+        elif test_id in ("TEST-A.4.2.1", "zero_setting_test"):
             specialized_result = self._calculate_zero_setting_test(context, observations, test_def)
+        elif test_id == "TEST-A.4.2.3":
+            specialized_result = self._calculate_zero_setting_accuracy_test(context, observations, test_def)
+        elif test_id in ("TEST-A.4.11.1", "TEST-A.5.1", "tilting_test"):
+            specialized_result = self._calculate_tilting_test(context, observations, test_def)
+        elif test_id in ("TEST-A.4.11.2", "zero_return_test"):
+            specialized_result = self._calculate_zero_return_test(context, observations, test_def)
+        elif test_id in ("TEST-A.4.12", "stability_of_equilibrium_test", "stability_test"):
+            specialized_result = self._calculate_stability_of_equilibrium_test(context, observations, test_def)
 
         if specialized_result:
             calc_status = specialized_result.get("status", "ERROR")
@@ -1026,10 +1389,14 @@ class EvaluationService:
         test_results = evaluation.get("test_results", [])
 
         # Count statuses among applicable tests
-        applicable = [t for t in test_results if t.get("applicability_status") != "NOT_APPLICABLE"]
-        passed = sum(1 for t in applicable if t["status"] == "PASS")
-        failed = sum(1 for t in applicable if t["status"] == "FAIL")
-        review = sum(1 for t in applicable if t["status"] in ("MANUAL_REVIEW", "IN_PROGRESS", "NOT_STARTED"))
+        applicable = [
+            t for t in test_results
+            if str(t.get("applicability_status") or t.get("applicability") or "").upper() != "NOT_APPLICABLE"
+            and str(t.get("status") or "").upper() != "NOT_APPLICABLE"
+        ]
+        passed = sum(1 for t in applicable if str(t.get("status", "")).upper() == "PASS")
+        failed = sum(1 for t in applicable if str(t.get("status", "")).upper() == "FAIL")
+        review = sum(1 for t in applicable if str(t.get("status", "")).upper() in ("MANUAL_REVIEW", "IN_PROGRESS", "NOT_STARTED"))
 
         if failed > 0:
             overall_status = "failed"

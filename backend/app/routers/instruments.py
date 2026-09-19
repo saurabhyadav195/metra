@@ -36,15 +36,7 @@ router = APIRouter()
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def _row_to_response(row: dict) -> InstrumentResponse:
-    """
-    Map database column names to API response field names.
-    Database uses `model`; API uses `model_designation`.
-    """
-    row = dict(row)
-
-    if row.get("model_designation") is None:
-        row["model_designation"] = row.get("model")
-
+    """Map database row to API InstrumentResponse."""
     return InstrumentResponse(**row)
 
 
@@ -116,7 +108,7 @@ async def list_instruments(
         term = search.lower()
         rows = [
             r for r in rows
-            if term in (r.get("model") or r.get("model_designation") or "").lower()
+            if term in (r.get("model") or "").lower()
             or term in (r.get("manufacturer") or "").lower()
             or term in (r.get("serial_number") or "").lower()
         ]
@@ -185,10 +177,6 @@ async def create_instrument(
 
     payload = body.model_dump(exclude_none=True)
 
-    # Database uses `model`; API uses `model_designation`
-    if "model_designation" in payload:
-        payload["model"] = payload.pop("model_designation")
-
     # Convert date to ISO string if present
     if "submission_date" in payload and isinstance(payload["submission_date"], date):
         payload["submission_date"] = payload["submission_date"].isoformat()
@@ -216,7 +204,7 @@ async def create_instrument(
 
     instrument = result.data[0]
 
-    return instrument
+    return _row_to_response(instrument)
 
 
 # ── PATCH /api/instruments/{id} ────────────────────────────────────────────────

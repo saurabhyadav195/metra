@@ -3,6 +3,13 @@
  * TypeScript types mirroring the instruments database table and API contracts.
  */
 
+export interface WeighingInterval {
+  /** Upper bound of this partial weighing range (in instrument unit, e.g. kg) */
+  max_load: number;
+  /** Verification scale interval e for this partial range */
+  e: number;
+}
+
 export type InstrumentStatus =
   | "registered"
   | "under_evaluation"
@@ -47,7 +54,7 @@ export interface Instrument {
   // Instrument Information
   manufacturer: string;
   manufacturer_address: string | null;
-  model_designation: string;
+  model: string;
   serial_number: string;
   instrument_type: string;
   accuracy_class: string | null;
@@ -58,6 +65,8 @@ export interface Instrument {
   verification_scale_interval: number | null;
   actual_scale_interval: number | null;
   verification_intervals: number | null;
+  /** Per-interval weighing ranges for multi-interval / multi-range instruments (OIML T.3.2.6) */
+  weighing_intervals: WeighingInterval[] | null;
 
   // Technical Information
   load_receptor_type: string | null;
@@ -77,7 +86,7 @@ export interface Instrument {
 export interface CreateInstrumentInput {
   manufacturer: string;
   manufacturer_address?: string;
-  model_designation: string;
+  model: string;
   serial_number: string;
   instrument_type: InstrumentType;
   accuracy_class?: string;
@@ -87,6 +96,8 @@ export interface CreateInstrumentInput {
   verification_scale_interval: number;
   actual_scale_interval?: number;
   verification_intervals?: number;
+  /** Per-interval weighing ranges for multi-interval / multi-range instruments */
+  weighing_intervals?: WeighingInterval[];
 
   load_receptor_type?: string;
   indicating_device_type?: string;

@@ -70,8 +70,7 @@ export interface Evaluation {
 export interface EvaluationInstrument {
   id: string;
   manufacturer: string;
-  model_designation: string;
-  model?: string;
+  model: string;
   serial_number: string;
   instrument_type: string;
   accuracy_class: string | null;

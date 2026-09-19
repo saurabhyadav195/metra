@@ -108,7 +108,7 @@ export default function EvaluationSetupPage() {
           ...(instrument
             ? [
                 {
-                  label: `${instrument.manufacturer} ${instrument.model_designation || (instrument as any).model}`,
+                  label: `${instrument.manufacturer} ${instrument.model}`,
                   href: `/app/instruments/${id}`,
                 },
               ]
@@ -150,7 +150,7 @@ export default function EvaluationSetupPage() {
                       Model
                     </p>
                     <p className="mt-1 text-sm font-medium text-foreground">
-                      {instrument.model_designation || (instrument as any).model || "N/A"}
+                      {instrument.model || "N/A"}
                     </p>
                   </div>
                   <div>

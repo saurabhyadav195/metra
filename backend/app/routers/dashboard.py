@@ -52,7 +52,7 @@ async def get_dashboard_stats(
     # 2. Evaluations for caller's laboratory
     eval_res = (
         client.table("evaluations")
-        .select("*, instruments(model, model_designation, manufacturer, serial_number)")
+        .select("*, instruments(model, manufacturer, serial_number)")
         .eq("laboratory_id", caller.laboratory_id)
         .order("created_at", desc=True)
         .execute()
@@ -84,7 +84,7 @@ async def get_dashboard_stats(
     recent_evaluations = []
     for ev in all_evals[:5]:
         inst = ev.get("instruments") or instruments_map.get(ev.get("instrument_id")) or {}
-        model_name = inst.get("model_designation") or inst.get("model") or "Instrument"
+        model_name = inst.get("model") or "Instrument"
         recent_evaluations.append({
             "id": ev.get("id"),
             "evaluation_number": ev.get("evaluation_number") or f"EVL-{str(ev.get('id'))[:8].upper()}",

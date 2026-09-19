@@ -51,6 +51,81 @@ function devLog(...args: unknown[]) {
   if (IS_DEV) console.log(...args);
 }
 
+// ── Helper: Universal Observation Payload Validation ──────────────────────────
+function hasObservationData(obs: Record<string, any> | null | undefined): boolean {
+  if (!obs || typeof obs !== "object") return false;
+
+  let targetObs = obs;
+  if (obs.observations && typeof obs.observations === "object" && !Array.isArray(obs.observations)) {
+    targetObs = obs.observations as Record<string, any>;
+  }
+
+  // 1. Direct array properties commonly used across test forms
+  const arrayKeys = [
+    "positions",
+    "load_steps",
+    "readings",
+    "rows",
+    "test_points",
+    "steps",
+    "disturbances",
+    "runs",
+    "trials",
+    "points",
+  ];
+  for (const key of arrayKeys) {
+    if (Array.isArray(targetObs[key]) && targetObs[key].length > 0) {
+      return true;
+    }
+  }
+
+  // 2. Multi-stage or nested objects containing readings/trials/rows (Temperature, Voltage, Damp Heat, Repeatability, Endurance)
+  const stageKeys = ["low", "reference", "high", "initial", "damp_heat", "final", "set1", "set2"];
+  for (const key of stageKeys) {
+    const stage = targetObs[key];
+    if (stage && typeof stage === "object") {
+      for (const subKey of arrayKeys) {
+        if (Array.isArray(stage[subKey]) && stage[subKey].length > 0) {
+          return true;
+        }
+      }
+      if (Object.keys(stage).length > 0) {
+        return true;
+      }
+    }
+  }
+
+  // 3. Scalar/value observation properties
+  const scalarKeys = [
+    "observed_value",
+    "E0",
+    "d",
+    "positive_range",
+    "negative_range",
+    "dL",
+    "initial_indication",
+    "target_load",
+  ];
+  for (const key of scalarKeys) {
+    if (targetObs[key] !== undefined && targetObs[key] !== null && String(targetObs[key]).trim() !== "") {
+      return true;
+    }
+  }
+
+  // 4. Fallback: check if any key in object has non-empty data
+  const keys = Object.keys(targetObs);
+  if (keys.length > 0) {
+    return keys.some((k) => {
+      const val = targetObs[k];
+      if (Array.isArray(val)) return val.length > 0;
+      if (val && typeof val === "object") return Object.keys(val).length > 0;
+      return val !== undefined && val !== null && String(val).trim() !== "";
+    });
+  }
+
+  return false;
+}
+
 export default function TestExecutionPage() {
   const { evaluationId, testId } = useParams<{ evaluationId: string; testId: string }>();
   const navigate = useNavigate();
@@ -81,15 +156,12 @@ export default function TestExecutionPage() {
     }
 
     // ── KEY FIX 1: Reset ALL state before fetching new test ───────────────────
-    // Without this, old test data from Test A briefly renders under the new
-    // TestFormDispatcher slot for Test B, which can crash if the observations
-    // object has an incompatible shape for Test B's form component.
     setLoading(true);
     setError(null);
     setNotFound(false);
-    setTestDetail(null);       // <-- critical: wipe old detail
-    setObservations({});       // <-- critical: wipe old observations
-    setCalcResult(null);       // <-- critical: wipe old calc result
+    setTestDetail(null);       // Wipe old detail
+    setObservations({});       // Wipe old observations
+    setCalcResult(null);       // Wipe old calc result
     setStatusMessage(null);
 
     devLog("[METRA TEST] render", {
@@ -99,17 +171,12 @@ export default function TestExecutionPage() {
       hasTest: false,
     });
 
-    // ── KEY FIX 2: AbortController prevents race conditions ───────────────────
-    // Scenario without this: user clicks Test A → quickly clicks Test B →
-    // Test B's response arrives first, then Test A's response arrives later
-    // and overwrites Test B's state, rendering the wrong form component.
     const requestKey = `${evaluationId}:${testId}`;
     currentRequestKey.current = requestKey;
     const abortController = new AbortController();
 
     getTestDetail(evaluationId, testId)
       .then((detail) => {
-        // Discard if a newer request has already been fired.
         if (currentRequestKey.current !== requestKey) {
           devLog("[METRA TEST] Discarding stale response for", requestKey);
           return;
@@ -127,7 +194,6 @@ export default function TestExecutionPage() {
         // Restore saved observations only when shape is a plain object.
         if (detail?.observations && typeof detail.observations === "object" && !Array.isArray(detail.observations)) {
           let obsObj = detail.observations as Record<string, any>;
-          // Unwrap if double-wrapped from previous backend saving issue
           if (obsObj.observations && typeof obsObj.observations === "object" && !Array.isArray(obsObj.observations)) {
             obsObj = obsObj.observations;
           }
@@ -163,7 +229,7 @@ export default function TestExecutionPage() {
         }
       })
       .catch((err: any) => {
-        if (abortController.signal.aborted) return; // ignore abort errors
+        if (abortController.signal.aborted) return;
         if (currentRequestKey.current !== requestKey) return;
 
         const status = err?.response?.status ?? err?.status;
@@ -181,7 +247,6 @@ export default function TestExecutionPage() {
         setLoading(false);
       });
 
-    // Cleanup: signal any in-flight request that we navigated away.
     return () => {
       abortController.abort();
     };
@@ -192,15 +257,8 @@ export default function TestExecutionPage() {
   const handleCalculate = async () => {
     if (!evaluationId || !testId) return;
 
-    // Check visible observation rows before calling calculation API
-    const obsRows =
-      observations?.positions ||
-      observations?.load_steps ||
-      observations?.readings ||
-      observations?.rows ||
-      observations?.test_points ||
-      (observations?.observed_value !== undefined ? [observations.observed_value] : []);
-    if (Array.isArray(obsRows) && obsRows.length === 0) {
+    // Universal observation check
+    if (!hasObservationData(observations)) {
       setStatusMessage("Calculation error: At least 1 observation row is required before calculating.");
       return;
     }

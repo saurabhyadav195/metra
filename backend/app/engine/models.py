@@ -31,6 +31,12 @@ class OverallEvaluationStatus(str, Enum):
     REQUIRES_REVIEW = "REQUIRES_REVIEW"
 
 
+class WeighingInterval(BaseModel):
+    """Single partial weighing range for multi-interval / multi-range instruments (OIML T.3.2.6/T.3.2.7)."""
+    max_load: float  # Upper bound of this interval in the instrument's unit
+    e: float         # Verification scale interval for this partial range
+
+
 class EvaluationContext(BaseModel):
     """Context derived from Instrument specifications used for rule evaluation."""
     instrument_id: str
@@ -40,7 +46,7 @@ class EvaluationContext(BaseModel):
     accuracy_class: str = "III"  # I, II, III, IIII
     max_capacity: float  # Max load in main unit
     min_capacity: float = 0.0  # Min load
-    e_resolution: float  # Verification scale interval e
+    e_resolution: float  # Verification scale interval e (single-interval fallback)
     d_resolution: float  # Scale interval d
     n_intervals: Optional[int] = None  # Number of verification scale intervals n = Max / e
     unit: str = "kg"
@@ -54,6 +60,9 @@ class EvaluationContext(BaseModel):
     tare_type: Optional[str] = None  # subtractive, additive
     multi_range: bool = False
     verification_type: str = "initial"  # initial, service
+    # Multi-interval support (OIML T.3.2.6 / T.3.2.7)
+    weighing_intervals: Optional[List[WeighingInterval]] = None  # Ordered ascending by max_load
+    e1_resolution: Optional[float] = None  # Smallest e (first interval); used for fixed-e₁ OIML limits
 
 
 class MPEResult(BaseModel):

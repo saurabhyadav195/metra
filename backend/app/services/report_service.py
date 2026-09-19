@@ -140,7 +140,7 @@ class ReportService:
             "instrument": {
                 "id": instrument.get("id"),
                 "manufacturer": instrument.get("manufacturer") or "N/A",
-                "model": instrument.get("model_designation") or instrument.get("model") or "N/A",
+                "model": instrument.get("model") or "N/A",
                 "serial_number": instrument.get("serial_number") or "N/A",
                 "accuracy_class": instrument.get("accuracy_class") or "III",
                 "max_capacity": max_cap,

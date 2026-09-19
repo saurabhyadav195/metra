@@ -129,6 +129,9 @@ class InputValidator:
                 # Check if optional or missing
                 if req.get("optional") is True or req.get("default") is not None:
                     continue
+                # For array-based tests (repeatability, tilting, zero return), check if steps/rows/positions/readings are provided
+                if param_name in ("test_load", "number_of_weighings", "zero_deviation", "e") and any(k in merged_inputs for k in ("steps", "rows", "load_steps", "positions", "tilt_positions", "load_sets", "repeatability_sets", "sets", "groups", "readings", "repeatability_readings")):
+                    continue
                 results.append(ValidationResult(
                     rule_id="VAL_REQUIRED_INPUT_MISSING",
                     param_name=param_name,

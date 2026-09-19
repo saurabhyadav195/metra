@@ -61,7 +61,7 @@ export default function EvaluationPlaceholderPage() {
                 Selected Instrument:
               </p>
               <p className="mt-0.5 text-muted-foreground">
-                {instrument.model_designation} &middot; {instrument.manufacturer}{" "}
+                {instrument.model} &middot; {instrument.manufacturer}{" "}
                 &middot; SN: {instrument.serial_number}
               </p>
             </div>

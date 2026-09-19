@@ -96,7 +96,7 @@ export default function InstrumentDetailPage() {
 
   useEffect(() => {
     if (instrument) {
-      document.title = `METRA — ${instrument.model_designation} (${instrument.serial_number})`;
+      document.title = `METRA — ${instrument.model} (${instrument.serial_number})`;
     }
   }, [instrument]);
 
@@ -192,7 +192,7 @@ export default function InstrumentDetailPage() {
             <div>
               <div className="flex items-center gap-3">
                 <h1 className="text-2xl font-bold text-foreground">
-                  {instrument.model_designation || (instrument as any).model || "Unnamed Model"}
+                  {instrument.model || "Unnamed Model"}
                 </h1>
                 <InstrumentStatusBadge status={instrument.status} />
               </div>
@@ -225,7 +225,7 @@ export default function InstrumentDetailPage() {
               label="Manufacturer Address"
               value={instrument.manufacturer_address}
             />
-            <DetailRow label="Model Designation" value={instrument.model_designation} />
+            <DetailRow label="Model Designation" value={instrument.model} />
             <DetailRow
               label="Serial Number"
               value={instrument.serial_number}
@@ -260,14 +260,59 @@ export default function InstrumentDetailPage() {
                   : null
               }
             />
-            <DetailRow
-              label="Verification Scale Interval (e)"
-              value={
-                instrument.verification_scale_interval !== null
-                  ? `${instrument.verification_scale_interval} kg`
-                  : null
-              }
-            />
+            {Array.isArray(instrument.weighing_intervals) &&
+            instrument.weighing_intervals.length > 0 ? (
+              <div className="py-2.5">
+                <dt className="text-xs font-medium text-muted-foreground mb-2">
+                  Weighing Intervals (Multi-interval OIML T.3.2.6)
+                </dt>
+                <dd className="sm:col-span-2">
+                  <div className="overflow-x-auto rounded border border-border">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-muted/50 font-medium text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-1.5 border-b border-border">Interval #</th>
+                          <th className="px-3 py-1.5 border-b border-border">Partial Range</th>
+                          <th className="px-3 py-1.5 border-b border-border">Max Load</th>
+                          <th className="px-3 py-1.5 border-b border-border">e (Verification Scale Interval)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/50 font-mono text-[11px]">
+                        {instrument.weighing_intervals.map((iv, idx, arr) => {
+                          const minBound =
+                            idx === 0
+                              ? instrument.min_capacity || 0
+                              : arr[idx - 1].max_load;
+                          return (
+                            <tr key={idx}>
+                              <td className="px-3 py-1.5 text-foreground font-semibold">
+                                W{idx + 1}
+                              </td>
+                              <td className="px-3 py-1.5">
+                                {minBound} – {iv.max_load} kg
+                              </td>
+                              <td className="px-3 py-1.5">{iv.max_load} kg</td>
+                              <td className="px-3 py-1.5 font-bold text-primary">
+                                {iv.e} kg
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </dd>
+              </div>
+            ) : (
+              <DetailRow
+                label="Verification Scale Interval (e)"
+                value={
+                  instrument.verification_scale_interval !== null
+                    ? `${instrument.verification_scale_interval} kg`
+                    : null
+                }
+              />
+            )}
             <DetailRow
               label="Actual Scale Interval (d)"
               value={
@@ -332,7 +377,7 @@ export default function InstrumentDetailPage() {
               <DialogDescription>
                 Are you sure you want to delete{" "}
                 <span className="font-semibold text-foreground">
-                  {instrument.model_designation} (SN: {instrument.serial_number})
+                  {instrument.model} (SN: {instrument.serial_number})
                 </span>
                 ? This action cannot be undone.
               </DialogDescription>

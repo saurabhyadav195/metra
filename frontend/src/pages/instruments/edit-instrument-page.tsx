@@ -39,7 +39,7 @@ export default function EditInstrumentPage() {
 
   useEffect(() => {
     if (instrument) {
-      document.title = `METRA — Edit ${instrument.model_designation}`;
+      document.title = `METRA — Edit ${instrument.model}`;
     }
   }, [instrument]);
 
@@ -99,7 +99,7 @@ export default function EditInstrumentPage() {
   const defaultValues: Partial<InstrumentFormValues> = {
     manufacturer: instrument.manufacturer,
     manufacturer_address: instrument.manufacturer_address ?? "",
-    model_designation: instrument.model_designation,
+    model: instrument.model,
     serial_number: instrument.serial_number,
     instrument_type: instrument.instrument_type as InstrumentFormValues["instrument_type"],
     accuracy_class: instrument.accuracy_class ?? "",
@@ -111,6 +111,16 @@ export default function EditInstrumentPage() {
     actual_scale_interval: instrument.actual_scale_interval?.toString() ?? "",
     verification_intervals:
       instrument.verification_intervals?.toString() ?? "",
+
+    is_multi_interval:
+      Array.isArray(instrument.weighing_intervals) &&
+      instrument.weighing_intervals.length > 0,
+    weighing_intervals: Array.isArray(instrument.weighing_intervals)
+      ? instrument.weighing_intervals.map((iv) => ({
+          max_load: iv.max_load.toString(),
+          e: iv.e.toString(),
+        }))
+      : [],
 
     load_receptor_type: instrument.load_receptor_type ?? "",
     indicating_device_type: instrument.indicating_device_type ?? "",
@@ -140,7 +150,7 @@ export default function EditInstrumentPage() {
             Edit Instrument
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Update technical parameters for {instrument.model_designation} (SN: {instrument.serial_number}).
+            Update technical parameters for {instrument.model} (SN: {instrument.serial_number}).
           </p>
         </div>
 

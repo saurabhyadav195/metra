@@ -40,7 +40,7 @@ async def list_reports(
     """
     res = (
         client.table("evaluations")
-        .select("*, instruments(model, model_designation, manufacturer, serial_number)")
+        .select("*, instruments(model, manufacturer, serial_number)")
         .eq("laboratory_id", caller.laboratory_id)
         .execute()
     )
@@ -57,7 +57,7 @@ async def list_reports(
     reports = []
     for ev in evals:
         inst = ev.get("instruments") or {}
-        model_name = inst.get("model_designation") or inst.get("model") or "N/A"
+        model_name = inst.get("model") or "N/A"
         overall_res = None
         if isinstance(ev.get("overall_result"), dict):
             overall_res = ev.get("overall_result").get("result")

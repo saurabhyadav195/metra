@@ -29,7 +29,7 @@ class ResultBuilder:
             overall = OverallEvaluationStatus.COMPLETED_FAIL
         elif review > 0:
             overall = OverallEvaluationStatus.REQUIRES_REVIEW
-        elif passed > 0 and (passed + not_applicable == total):
+        elif passed > 0 and (passed + not_applicable == total or passed == applicable):
             overall = OverallEvaluationStatus.COMPLETED_PASS
         else:
             overall = OverallEvaluationStatus.IN_PROGRESS
