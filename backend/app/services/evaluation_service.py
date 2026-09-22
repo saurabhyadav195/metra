@@ -249,6 +249,7 @@ class EvaluationService:
         eval_insert = {
             "laboratory_id": caller.laboratory_id,
             "instrument_id": instrument_id,
+            "engineer_id": caller.user_id,
             "created_by": caller.user_id,
             "evaluation_number": eval_number,
             "status": "in_progress",
@@ -1505,7 +1506,11 @@ class EvaluationService:
         return await self.get_test_detail(evaluation_id, test_id, caller)
 
     async def finalize_evaluation(self, evaluation_id: str, caller: AuthenticatedUser) -> dict:
-        """Finalizes evaluation and computes overall PASS / FAIL / REQUIRES_REVIEW status."""
+        """
+        Computes the overall PASS/FAIL summary for an evaluation and persists it.
+        Does NOT change evaluation status — that is the router's responsibility
+        after successful PDF generation and storage.
+        """
         evaluation = await self.get_evaluation_detail(evaluation_id, caller)
         test_results = evaluation.get("test_results", [])
 
@@ -1520,11 +1525,11 @@ class EvaluationService:
         review = sum(1 for t in applicable if str(t.get("status", "")).upper() in ("MANUAL_REVIEW", "IN_PROGRESS", "NOT_STARTED"))
 
         if failed > 0:
-            overall_status = "failed"
+            calc_result = "failed"
         elif review > 0:
-            overall_status = "requires_review"
+            calc_result = "requires_review"
         else:
-            overall_status = "passed"
+            calc_result = "passed"
 
         overall_data = {
             "total": len(test_results),
@@ -1532,20 +1537,23 @@ class EvaluationService:
             "passed": passed,
             "failed": failed,
             "review": review,
-            "status": overall_status,
+            "status": calc_result,
             "finalized_by": caller.user_id,
             "finalized_at": datetime.utcnow().isoformat()
         }
 
-        eval_update = {
-            "status": overall_status,
+        # Persist overall result and completed_at, but do NOT change status here.
+        # Status transition to PENDING_VERIFICATION is performed by the router
+        # only after the report PDF has been successfully generated and stored.
+        eval_update: dict = {
             "overall_result": overall_data,
-            "completed_at": datetime.utcnow().isoformat()
+            "completed_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat(),
         }
-        if caller.role in ("owner", "admin"):
-            eval_update["approved_by"] = caller.user_id
-            eval_update["approved_at"] = datetime.utcnow().isoformat()
+        if not evaluation.get("engineer_id"):
+            eval_update["engineer_id"] = caller.user_id
 
         self._safe_update("evaluations", eval_update, "id", evaluation_id)
 
-        return await self.get_evaluation_detail(evaluation_id, caller)
+        return overall_data
+

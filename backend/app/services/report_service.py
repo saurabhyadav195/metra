@@ -42,16 +42,16 @@ class ReportService:
         except Exception:
             pass
 
-        # 2. Resolve Evaluator ("Evaluated By") from profiles table
-        evaluator_id = evaluation.get("created_by") or caller.user_id
-        evaluator_name = caller.full_name
-        evaluator_role = "Testing Engineer / Metrologist" if caller.role == "engineer" else "Laboratory Administrator"
+        # 2. Resolve Evaluator ("Evaluated By") strictly from profiles table using engineer_id
+        evaluator_id = evaluation.get("engineer_id")
+        evaluator_name = "Unknown Engineer"
+        evaluator_role = "Testing Engineer / Metrologist"
 
         if evaluator_id:
             try:
                 prof_res = self.client.table("profiles").select("full_name, role").eq("id", evaluator_id).single().execute()
                 if prof_res.data:
-                    evaluator_name = prof_res.data.get("full_name") or evaluator_name
+                    evaluator_name = prof_res.data.get("full_name") or "Unknown Engineer"
                     role_code = prof_res.data.get("role", "")
                     if role_code == "engineer":
                         evaluator_role = "Testing Engineer"
@@ -62,45 +62,36 @@ class ReportService:
             except Exception:
                 pass
 
-        # 3. Resolve Approver ("Approved & Verified By") from profiles table
-        approver_id = evaluation.get("approved_by") or evaluation.get("approver_id")
+        # 3. Resolve Approver ("Approved & Verified By") strictly from profiles table using approved_by
+        eval_status = str(evaluation.get("status", "")).lower()
+        approver_id = evaluation.get("approved_by") if eval_status == "approved" else None
         approver_name = "Pending Approval"
         approver_role = "Authorized Quality Manager / Director"
-        approval_status = "PENDING_APPROVAL"
-        approved_at = evaluation.get("approved_at")
+        approval_status = "APPROVED" if (approver_id and eval_status == "approved") else "PENDING_APPROVAL"
+        approved_at = evaluation.get("approved_at") if eval_status == "approved" else None
 
-        if approver_id:
+        if approver_id and eval_status == "approved":
             try:
                 app_prof = self.client.table("profiles").select("full_name, role").eq("id", approver_id).single().execute()
                 if app_prof.data:
-                    approver_name = app_prof.data.get("full_name") or approver_name
+                    approver_name = app_prof.data.get("full_name") or "Authorized Approver"
                     r_code = app_prof.data.get("role", "")
                     approver_role = "Laboratory Director" if r_code == "owner" else "Quality Manager / Admin"
-                    approval_status = "APPROVED"
             except Exception:
                 pass
-        else:
-            # Check overall_result for finalized_by if set by an owner/admin
-            overall = evaluation.get("overall_result")
-            if isinstance(overall, dict) and overall.get("finalized_by"):
-                fin_id = overall.get("finalized_by")
-                try:
-                    fin_prof = self.client.table("profiles").select("full_name, role").eq("id", fin_id).single().execute()
-                    if fin_prof.data and fin_prof.data.get("role") in ("owner", "admin"):
-                        approver_name = fin_prof.data.get("full_name") or "Authorized Approver"
-                        r_code = fin_prof.data.get("role", "")
-                        approver_role = "Laboratory Director" if r_code == "owner" else "Quality Manager / Admin"
-                        approval_status = "APPROVED"
-                        approved_at = overall.get("finalized_at") or evaluation.get("completed_at")
-                        approver_id = fin_id
-                except Exception:
-                    pass
 
-        # 4. Fetch detailed test calculations & validations for all tests
-        test_results = evaluation.get("test_results", [])
+        # 4. Fetch detailed test calculations & validations for EXECUTED tests only.
+        # NOT_STARTED and NOT_APPLICABLE tests are excluded from the official report —
+        # they have no observations, no calculations, and should never appear as PASS.
+        _excluded_statuses = {"NOT_STARTED", "NOT_APPLICABLE"}
+        all_test_results = evaluation.get("test_results", [])
+        executed_tests = [
+            tr for tr in all_test_results
+            if str(tr.get("status", "")).upper() not in _excluded_statuses
+        ]
         detailed_tests = []
 
-        for tr in test_results:
+        for tr in executed_tests:
             detail = await self.eval_service.get_test_detail(evaluation_id, tr["test_id"], caller)
             detailed_tests.append(detail)
 

@@ -5,12 +5,13 @@
  * Registration page for adding a new instrument to the laboratory.
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, Link } from "react-router-dom";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { InstrumentForm } from "@/components/instruments/instrument-form";
 import { createInstrument } from "@/services/api/instruments";
+import { uploadInstrumentDocument } from "@/services/storage";
 import { ApiError } from "@/services/api/client";
 import type { CreateInstrumentInput } from "@/types/instrument";
 
@@ -18,6 +19,11 @@ export default function NewInstrumentPage() {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const queuedFilesRef = useRef<File[]>([]);
+
+  const handleQueuedFiles = (files: File[]) => {
+    queuedFilesRef.current = files;
+  };
 
   useEffect(() => {
     document.title = "METRA — Register Instrument";
@@ -29,6 +35,20 @@ export default function NewInstrumentPage() {
 
     try {
       const newInstrument = await createInstrument(data);
+
+      // Upload any queued documents using the newly created instrument ID
+      const queued = queuedFilesRef.current;
+      if (queued.length > 0) {
+        for (const file of queued) {
+          try {
+            await uploadInstrumentDocument(newInstrument.id, file);
+          } catch {
+            // Non-blocking: instrument was created; surface warning but don't block navigation
+            console.warn(`[METRA] Failed to upload document: ${file.name}`);
+          }
+        }
+      }
+
       navigate(`/app/instruments/${newInstrument.id}`, { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -70,6 +90,7 @@ export default function NewInstrumentPage() {
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}
             submitError={submitError}
+            onQueuedFilesReady={handleQueuedFiles}
           />
         </div>
       </div>

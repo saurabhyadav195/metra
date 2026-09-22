@@ -3,7 +3,7 @@
  * Typed API client for laboratory reports.
  */
 
-import { apiGet } from "./client";
+import { apiGet, apiPost } from "./client";
 
 export interface ReportListItem {
   id: string;
@@ -15,6 +15,7 @@ export interface ReportListItem {
   generated_by: string;
   generated_at: string;
   status: string;
+  evaluation_status?: string;
   overall_result?: string;
 }
 
@@ -24,4 +25,16 @@ export function listReports(): Promise<ReportListItem[]> {
 
 export function getReportDetail(reportId: string): Promise<any> {
   return apiGet<any>(`/api/reports/${reportId}`);
+}
+
+export function approveReport(evaluationId: string): Promise<any> {
+  return apiPost<any>(`/api/reports/${evaluationId}/approve`, {});
+}
+
+export function rejectReport(evaluationId: string, reason: string): Promise<any> {
+  return apiPost<any>(`/api/reports/${evaluationId}/reject`, { reason });
+}
+
+export function verifyReport(reportId: string): Promise<any> {
+  return apiGet<any>(`/api/verify/${reportId}`);
 }

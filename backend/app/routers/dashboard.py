@@ -66,9 +66,9 @@ async def get_dashboard_stats(
     else:
         all_evals = raw_evals
 
-    active_evaluations = sum(1 for e in all_evals if e.get("status") in ("DRAFT", "IN_PROGRESS"))
-    completed_evaluations = sum(1 for e in all_evals if e.get("status") in ("COMPLETED", "PASSED", "FAILED", "PASS", "FAIL"))
-    total_reports = completed_evaluations
+    active_evaluations = sum(1 for e in all_evals if str(e.get("status", "")).lower() in ("draft", "in_progress"))
+    completed_evaluations = sum(1 for e in all_evals if str(e.get("status", "")).lower() in ("completed", "passed", "failed", "pass", "fail", "pending_verification", "approved", "requires_rework"))
+    total_reports = sum(1 for e in all_evals if str(e.get("status", "")).lower() in ("pending_verification", "approved", "requires_rework"))
 
     # 3. Team Engineers count
     profiles_res = (

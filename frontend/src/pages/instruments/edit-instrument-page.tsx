@@ -158,6 +158,7 @@ export default function EditInstrumentPage() {
         <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
           <InstrumentForm
             mode="edit"
+            instrumentId={id}
             defaultValues={defaultValues}
             onSubmit={handleSubmit}
             isSubmitting={isSubmitting}

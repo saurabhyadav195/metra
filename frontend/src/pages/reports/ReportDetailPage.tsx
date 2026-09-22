@@ -3,23 +3,24 @@
  * Route: /app/reports/:reportId
  * Official Technical Metrology Evaluation & Type-Test Laboratory Report.
  *
- * BUSINESS & SECURITY RULES:
- * - Primary branding represents the physical TESTING LABORATORY that performed the evaluation.
- * - METRA is secondary system attribution ("Generated using METRA").
- * - Evaluator and Approver names/roles come from authoritative backend user profiles.
- * - Unapproved reports explicitly display "Pending Approval".
- * - Includes @media print styles for physical printing and PDF export.
+ * REQUIRED REPORT VIEW BEHAVIOR:
+ * 1. Automatic Storage Check: On open, checks Supabase Storage for the official PDF using evaluation UUID.
+ * 2. Actual PDF Rendering: If official PDF exists, renders actual PDF pages using PDF.js canvas renderer (PdfReportViewer).
+ *    - Completely eliminates Chrome/browser native PDF iframe viewer and toolbars.
+ *    - METRA controls surrounding UI (Back to Reports, Zoom, Download PDF).
+ *    - Does NOT render HTML report when official PDF exists.
+ * 3. HTML Fallback: Renders existing HTML report ONLY when no official PDF exists or fails to load,
+ *    clearly indicating fallback preview status.
  */
 
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-  PrinterIcon,
   ArrowLeft01Icon,
   ShieldCheckIcon,
-  AlertCircleIcon,
   CheckmarkCircle02Icon,
+  AlertCircleIcon,
 } from "@hugeicons/core-free-icons";
 
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -27,29 +28,68 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { ResultBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { getReportDetail } from "@/services/api/reports";
+import {
+  getStoredReportPdf,
+  type StoredReportPdf,
+} from "@/services/storage";
 import { LoadingState } from "@/components/common/EmptyState";
+import { PdfReportViewer } from "@/components/reports/PdfReportViewer";
 
 export default function ReportDetailPage() {
   const { reportId } = useParams<{ reportId: string }>();
   const navigate = useNavigate();
+
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Stored PDF state
+  const [storedPdf, setStoredPdf] = useState<StoredReportPdf | null>(null);
+  const [checkingPdf, setCheckingPdf] = useState(true);
+  const [fallbackHtml, setFallbackHtml] = useState(false);
 
   useEffect(() => {
     document.title = `METRA — Laboratory Report ${reportId || ""}`;
     if (reportId) {
+      setLoading(true);
+      setCheckingPdf(true);
+      setFallbackHtml(false);
+
+      // 1. Fetch report data payload
       getReportDetail(reportId)
         .then((data) => {
           setReport(data);
+
+          // 2. Resolve database evaluation UUID for storage lookup
+          const evalUuid = data?.evaluation?.id;
+          if (evalUuid) {
+            getStoredReportPdf(evalUuid)
+              .then((pdf) => {
+                if (pdf) {
+                  setStoredPdf(pdf);
+                } else {
+                  setStoredPdf(null);
+                  setFallbackHtml(true);
+                }
+              })
+              .catch((err) => {
+                console.error("Failed to check stored report PDF:", err);
+                setStoredPdf(null);
+                setFallbackHtml(true);
+              })
+              .finally(() => setCheckingPdf(false));
+          } else {
+            setFallbackHtml(true);
+            setCheckingPdf(false);
+          }
         })
-        .catch((err) => console.error("Failed to load report detail:", err))
+        .catch((err) => {
+          console.error("Failed to load report detail:", err);
+          setFallbackHtml(true);
+          setCheckingPdf(false);
+        })
         .finally(() => setLoading(false));
     }
   }, [reportId]);
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return "__________________";
@@ -73,12 +113,39 @@ export default function ReportDetailPage() {
   const overallStatusStr =
     typeof evalInfo?.overall_result === "object"
       ? evalInfo?.overall_result?.status || evalInfo?.overall_result?.result
-      : evalInfo?.overall_result || evalInfo?.status || "PASS";
+      : evalInfo?.overall_result || evalInfo?.status || "PENDING";
 
   const isConforming =
     String(overallStatusStr).toLowerCase() === "pass" ||
     String(overallStatusStr).toLowerCase() === "passed";
 
+  // Show unified loading state while checking API & Storage (prevents HTML report flashing)
+  if (loading || checkingPdf) {
+    return (
+      <AppLayout>
+        <div className="max-w-4xl mx-auto py-8">
+          <LoadingState message="Checking Supabase Storage and loading official report..." />
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // ── CASE 1: OFFICIAL STORED PDF EXISTS → RENDER ACTUAL PDF CANVAS VIEWER ──────
+  if (storedPdf && storedPdf.signed_url && !fallbackHtml) {
+    return (
+      <AppLayout>
+        <PdfReportViewer
+          signedUrl={storedPdf.signed_url}
+          reportNumber={evalInfo.report_number || `TR-${reportId?.slice(0, 8).toUpperCase()}-2026`}
+          version={storedPdf.version}
+          onBack={() => navigate("/app/reports")}
+          onError={() => setFallbackHtml(true)}
+        />
+      </AppLayout>
+    );
+  }
+
+  // ── CASE 2: STORED PDF UNAVAILABLE → RENDER HTML REPORT FALLBACK PREVIEW ──────
   return (
     <AppLayout>
       <div className="space-y-6 max-w-4xl mx-auto">
@@ -86,23 +153,34 @@ export default function ReportDetailPage() {
           title={`Type Evaluation Report: ${evalInfo?.report_number || reportId}`}
           description={`Issued by ${lab?.name || "Testing Laboratory"} — OIML R-76 Technical Conformity`}
           actions={
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => navigate("/app/reports")}>
-                <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="size-3.5 mr-1" />
-                Back to Reports
-              </Button>
-              <Button size="sm" onClick={handlePrint} className="gap-1.5">
-                <HugeiconsIcon icon={PrinterIcon} strokeWidth={2} className="size-4" />
-                Print Official Report (PDF)
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate("/app/reports")}>
+              <HugeiconsIcon icon={ArrowLeft01Icon} strokeWidth={2} className="size-3.5 mr-1" />
+              Back to Reports
+            </Button>
           }
         />
 
-        {loading ? (
-          <LoadingState message="Assembling official laboratory evaluation report..." />
-        ) : (
-          <div className="bg-white text-slate-900 border border-slate-300 rounded-lg p-8 shadow-sm space-y-8 font-sans print:shadow-none print:border-none print:p-0 print:rounded-none">
+        <div className="space-y-6">
+          {/* Fallback Warning Banner */}
+          <div className="rounded-lg border border-amber-300 bg-amber-50/90 p-3.5 flex items-center justify-between text-xs text-amber-950">
+            <div className="flex items-center gap-2.5">
+              <HugeiconsIcon icon={AlertCircleIcon} strokeWidth={2} className="size-4 text-amber-700" />
+              <div>
+                <span className="font-bold">Official Stored PDF Unavailable — HTML Preview Fallback</span>
+                <span className="text-amber-800 ml-2">
+                  The official stored PDF could not be loaded from storage. Displaying dynamic HTML evaluation preview.
+                </span>
+              </div>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-semibold uppercase">
+              HTML FALLBACK
+            </span>
+          </div>
+
+          <div
+            id="report-container"
+            className="bg-white text-slate-900 border border-slate-300 rounded-lg p-8 shadow-sm space-y-8 font-sans print:shadow-none print:border-none print:p-0 print:rounded-none"
+          >
             {/* ── 1. LABORATORY HEADER & LETTERHEAD ─────────────────────────────── */}
             <div className="border-b-2 border-slate-900 pb-6 flex flex-col md:flex-row justify-between items-start gap-4">
               <div>
@@ -445,7 +523,7 @@ export default function ReportDetailPage() {
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
     </AppLayout>
   );

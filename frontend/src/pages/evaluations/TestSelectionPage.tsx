@@ -15,14 +15,18 @@ import {
   Cancel01Icon,
   AlertCircleIcon,
   Clock01Icon,
+  SentIcon,
+  ShieldKeyIcon,
 } from "@hugeicons/core-free-icons";
+import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Stepper, EVALUATION_STEPS } from "@/components/common/Stepper";
 import { SectionCard } from "@/components/common/SectionCard";
 import { Button } from "@/components/ui/button";
-import { getEvaluation } from "@/services/api/evaluations";
+import { useAuth } from "@/hooks/use-auth";
+import { getEvaluation, submitForApproval } from "@/services/api/evaluations";
 import { LoadingState } from "@/components/common/EmptyState";
 import type { Evaluation, EvaluationTestResult } from "@/types/evaluation";
 
@@ -207,25 +211,50 @@ function groupTestsByCategory(tests: EvaluationTestResult[]): TestCategoryGroup[
 export default function TestSelectionPage() {
   const { evaluationId } = useParams<{ evaluationId: string }>();
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [expandedReasons, setExpandedReasons] = useState<Record<string, boolean>>({});
 
-  useEffect(() => {
-    document.title = "METRA — Applicable OIML Tests";
+  const loadData = () => {
     if (evaluationId) {
       getEvaluation(evaluationId)
         .then(setEvaluation)
         .catch((err) => console.error("Failed to load evaluation tests:", err))
         .finally(() => setLoading(false));
     }
+  };
+
+  useEffect(() => {
+    document.title = "METRA — Applicable OIML Tests";
+    loadData();
   }, [evaluationId]);
 
   const testResults: EvaluationTestResult[] = evaluation?.test_results || (DEFAULT_TESTS as any);
   const categories = groupTestsByCategory(testResults);
+  const evalStatus = String(evaluation?.status || "").toUpperCase();
+
+  const isApproved = evalStatus === "APPROVED";
+  const isPendingVerification = evalStatus === "PENDING_VERIFICATION";
+  const isRequiresRework = evalStatus === "REQUIRES_REWORK" || (evaluation?.notes || "").startsWith("[REJECTED");
 
   const toggleReason = (testId: string) => {
     setExpandedReasons((prev) => ({ ...prev, [testId]: !prev[testId] }));
+  };
+
+  const handleSubmitForApproval = async () => {
+    if (!evaluationId) return;
+    try {
+      setSubmitting(true);
+      await submitForApproval(evaluationId);
+      toast.success("Evaluation submitted for laboratory manager verification!");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to submit evaluation for approval");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const renderStatusBadge = (test: EvaluationTestResult) => {
@@ -295,6 +324,51 @@ export default function TestSelectionPage() {
         <Stepper steps={EVALUATION_STEPS} currentStep={2} />
       </div>
 
+      {/* Rework Banner */}
+      {isRequiresRework && (
+        <div className="mb-6 rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 text-rose-800 dark:text-rose-300">
+          <div className="flex items-start gap-3">
+            <HugeiconsIcon icon={AlertCircleIcon} strokeWidth={2} className="size-5 shrink-0 text-rose-600 mt-0.5" />
+            <div>
+              <h4 className="font-semibold text-sm">Evaluation Returned for Rework</h4>
+              <p className="text-xs mt-1 leading-relaxed">
+                {evaluation?.notes || "This evaluation was rejected during manager verification and requires corrections."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approved Lock Banner */}
+      {isApproved && (
+        <div className="mb-6 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-800 dark:text-emerald-300">
+          <div className="flex items-center gap-3">
+            <HugeiconsIcon icon={ShieldKeyIcon} strokeWidth={2} className="size-5 shrink-0 text-emerald-600" />
+            <div>
+              <h4 className="font-semibold text-sm">Evaluation Approved & Permanently Locked</h4>
+              <p className="text-xs mt-0.5">
+                This evaluation has been officially approved and verified by laboratory management. All test observation data is read-only.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pending Verification Banner */}
+      {isPendingVerification && (
+        <div className="mb-6 rounded-lg border border-blue-500/30 bg-blue-500/10 p-4 text-blue-800 dark:text-blue-300">
+          <div className="flex items-center gap-3">
+            <HugeiconsIcon icon={Clock01Icon} strokeWidth={2} className="size-5 shrink-0 text-blue-600" />
+            <div>
+              <h4 className="font-semibold text-sm">Pending Verification</h4>
+              <p className="text-xs mt-0.5">
+                Submitted for quality manager approval. Modifications are restricted while verification is pending.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <LoadingState message="Loading applicable test suite from OIML rule engine..." />
       ) : (
@@ -338,11 +412,11 @@ export default function TestSelectionPage() {
                           ) : (
                             <Button
                               size="sm"
-                              variant={isFinished ? "outline" : "default"}
+                              variant={isApproved ? "outline" : isFinished ? "outline" : "default"}
                               className="text-xs gap-1.5"
                               onClick={() => navigate(`/app/evaluations/${evaluationId}/tests/${test.test_id}`)}
                             >
-                              {isFinished ? "Review Data" : "Execute Test"}
+                              {isApproved ? "View Data" : isFinished ? "Review Data" : "Execute Test"}
                               <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
                             </Button>
                           )}
@@ -370,8 +444,9 @@ export default function TestSelectionPage() {
             <Button variant="outline" size="sm" onClick={() => navigate(`/app/evaluations/${evaluationId}`)}>
               Back to Setup
             </Button>
-            <Button size="sm" onClick={() => navigate(`/app/evaluations/${evaluationId}/results`)}>
-              View Evaluation Summary →
+
+            <Button size="sm" variant="default" onClick={() => navigate(`/app/evaluations/${evaluationId}/results`)}>
+              Review Results & Finalize →
             </Button>
           </div>
         </div>

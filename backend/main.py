@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import dashboard, evaluations, instruments, reports, settings as lab_settings_router, team
+from app.routers import dashboard, evaluations, instruments, reports, settings as lab_settings_router, team, storage, verify
 
 app = FastAPI(
     title="METRA API",
@@ -34,6 +34,8 @@ app.include_router(dashboard.router, prefix="/api/dashboard", tags=["dashboard"]
 app.include_router(reports.router, prefix="/api/reports", tags=["reports"])
 app.include_router(team.router, prefix="/api/team", tags=["team"])
 app.include_router(lab_settings_router.router, prefix="/api/settings", tags=["settings"])
+app.include_router(storage.router, prefix="/api/storage", tags=["storage"])
+app.include_router(verify.router, prefix="/api/verify", tags=["verify"])
 
 
 

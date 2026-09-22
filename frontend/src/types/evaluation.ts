@@ -11,6 +11,9 @@ export type EvaluationStatus =
   | "PASS"
   | "FAIL"
   | "REQUIRES_REVIEW"
+  | "PENDING_VERIFICATION"
+  | "APPROVED"
+  | "REQUIRES_REWORK"
   | "COMPLETED"
   | "PASSED"
   | "FAILED";

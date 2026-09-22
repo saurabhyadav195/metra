@@ -10,28 +10,50 @@ import { useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   FileTextIcon,
-  Download01Icon,
   ViewIcon,
+  CheckmarkCircle02Icon,
+  Cancel01Icon,
 } from "@hugeicons/core-free-icons";
+import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge, ResultBadge } from "@/components/common/StatusBadge";
 import { EmptyState, LoadingState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
-import { listReports, type ReportListItem } from "@/services/api/reports";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  listReports,
+  approveReport,
+  rejectReport,
+  type ReportListItem,
+} from "@/services/api/reports";
 
 export default function ReportsPage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [reports, setReports] = useState<ReportListItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Rejection modal state
+  const [rejectTarget, setRejectTarget] = useState<ReportListItem | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+
+  const loadData = () => {
+    setLoading(true);
+    listReports()
+      .then(setReports)
+      .catch((err) => {
+        console.error("Failed to load reports:", err);
+        toast.error("Failed to load reports");
+      })
+      .finally(() => setLoading(false));
+  };
 
   useEffect(() => {
     document.title = "METRA — Test Reports";
-    listReports()
-      .then(setReports)
-      .catch((err) => console.error("Failed to load reports:", err))
-      .finally(() => setLoading(false));
+    loadData();
   }, []);
 
   const formatDate = (dateStr: string) => {
@@ -41,6 +63,37 @@ export default function ReportsPage() {
       month: "short",
       year: "numeric",
     });
+  };
+
+  const isOwnerOrAdmin = profile?.role === "owner" || profile?.role === "admin";
+
+  const handleApprove = async (rpt: ReportListItem) => {
+    try {
+      setActionLoading(rpt.evaluation_id);
+      await approveReport(rpt.evaluation_id);
+      toast.success(`Evaluation ${rpt.id} approved successfully`);
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to approve evaluation");
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleConfirmReject = async () => {
+    if (!rejectTarget || !rejectReason.trim()) return;
+    try {
+      setActionLoading(rejectTarget.evaluation_id);
+      await rejectReport(rejectTarget.evaluation_id, rejectReason.trim());
+      toast.success(`Evaluation ${rejectTarget.id} rejected for rework`);
+      setRejectTarget(null);
+      setRejectReason("");
+      loadData();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to reject evaluation");
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
@@ -57,7 +110,7 @@ export default function ReportsPage() {
           <EmptyState
             icon={FileTextIcon}
             title="No reports available"
-            description="Reports are automatically generated when evaluations are completed and finalized."
+            description="Reports are automatically generated when evaluations are completed and submitted for verification."
             action={
               <Button size="sm" onClick={() => navigate("/app/evaluations")}>
                 View Evaluations
@@ -85,6 +138,9 @@ export default function ReportsPage() {
                     Date
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Result
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wide">
@@ -93,44 +149,126 @@ export default function ReportsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {reports.map((rpt) => (
-                  <tr key={rpt.id} className="hover:bg-accent/50 transition-colors">
-                    <td className="px-4 py-3 font-mono text-xs font-medium text-foreground">
-                      {rpt.id}
-                    </td>
-                    <td className="px-4 py-3 font-medium text-foreground text-xs">
-                      {rpt.instrument_manufacturer} {rpt.instrument_model}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {rpt.serial_number}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-foreground">
-                      {rpt.generated_by}
-                    </td>
-                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                      {formatDate(rpt.generated_at)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <ResultBadge result={(rpt.overall_result as any) || "PASS"} size="sm" />
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => navigate(`/app/reports/${rpt.id}`)}
-                        className="text-xs gap-1"
-                      >
-                        <HugeiconsIcon icon={ViewIcon} strokeWidth={2} className="size-3.5" />
-                        Preview Report
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {reports.map((rpt) => {
+                  const statusUpper = String(rpt.evaluation_status || rpt.status || "").toUpperCase();
+                  const isPending = statusUpper === "PENDING_VERIFICATION";
+                  const isBusy = actionLoading === rpt.evaluation_id;
+
+                  return (
+                    <tr key={rpt.id} className="hover:bg-accent/50 transition-colors">
+                      <td className="px-4 py-3 font-mono text-xs font-medium text-foreground">
+                        {rpt.id}
+                      </td>
+                      <td className="px-4 py-3 font-medium text-foreground text-xs">
+                        {rpt.instrument_manufacturer} {rpt.instrument_model}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {rpt.serial_number}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-foreground font-medium">
+                        {rpt.generated_by}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                        {formatDate(rpt.generated_at)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          type="evaluation"
+                          status={rpt.evaluation_status || rpt.status}
+                          size="sm"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <ResultBadge result={(rpt.overall_result as any) || "PENDING"} size="sm" />
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => navigate(`/app/reports/${rpt.evaluation_id}`)}
+                            className="text-xs gap-1"
+                          >
+                            <HugeiconsIcon icon={ViewIcon} strokeWidth={2} className="size-3.5" />
+                            Preview Report
+                          </Button>
+
+                          {isOwnerOrAdmin && isPending && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isBusy}
+                                onClick={() => handleApprove(rpt)}
+                                className="text-xs gap-1 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+                              >
+                                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-3.5" />
+                                Approve
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isBusy}
+                                onClick={() => {
+                                  setRejectTarget(rpt);
+                                  setRejectReason("");
+                                }}
+                                className="text-xs gap-1 border-rose-500/30 text-rose-700 hover:bg-rose-500/10 dark:text-rose-400"
+                              >
+                                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
+                                Reject
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {/* Rejection Modal */}
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
+            <h3 className="text-base font-semibold text-foreground mb-1">Reject Evaluation for Rework</h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Please provide a clear reason for rejecting report <strong>{rejectTarget.id}</strong> back to the testing engineer.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Enter rejection reason / required corrections..."
+              className="w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary mb-4"
+              rows={4}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setRejectTarget(null);
+                  setRejectReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                disabled={!rejectReason.trim() || !!actionLoading}
+                onClick={handleConfirmReject}
+              >
+                {actionLoading ? "Rejecting..." : "Confirm Rejection"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

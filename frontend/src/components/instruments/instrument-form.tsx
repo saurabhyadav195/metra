@@ -5,7 +5,7 @@
  * Used by new-instrument-page and edit-instrument-page.
  */
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm, Controller, useFieldArray } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +25,12 @@ import {
 
 import type { CreateInstrumentInput, InstrumentType } from "@/types/instrument";
 import { INSTRUMENT_TYPES, INSTRUMENT_TYPE_LABELS } from "@/types/instrument";
+import {
+  listInstrumentDocuments,
+  uploadInstrumentDocument,
+  deleteInstrumentDocument,
+  type UploadedDocument,
+} from "@/services/storage";
 
 /* ── Schema ──────────────────────────────────────────────────────────────── */
 
@@ -152,9 +158,274 @@ export interface InstrumentFormProps {
   onSubmit: (data: CreateInstrumentInput) => Promise<void>;
   isSubmitting: boolean;
   submitError: string | null;
+  /** Instrument ID — required in edit mode to load/upload documents */
+  instrumentId?: string;
+  /** Called after instrument is saved in create mode with queued files to upload */
+  onQueuedFilesReady?: (files: File[]) => void;
 }
 
-/* ── Sub-components ──────────────────────────────────────────────────────── */
+/* ── Document Upload Section ──────────────────────────────────────────────── */
+
+const ACCEPTED_TYPES = [
+  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "text/plain",
+].join(",");
+
+interface DocumentUploadSectionProps {
+  mode: "create" | "edit";
+  instrumentId?: string;
+  onQueuedFilesReady?: (files: File[]) => void;
+}
+
+function DocumentUploadSection({ mode, instrumentId, onQueuedFilesReady }: DocumentUploadSectionProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Queued files (create mode — not yet uploaded)
+  const [queuedFiles, setQueuedFiles] = useState<File[]>([]);
+  const [queuedPreviews, setQueuedPreviews] = useState<Map<File, string>>(new Map());
+
+  // Uploaded files (edit mode — already in storage)
+  const [uploadedDocs, setUploadedDocs] = useState<UploadedDocument[]>([]);
+  const [loadingDocs, setLoadingDocs] = useState(false);
+
+  // Upload state (edit mode)
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  // Load existing docs in edit mode
+  useEffect(() => {
+    if (mode === "edit" && instrumentId) {
+      setLoadingDocs(true);
+      listInstrumentDocuments(instrumentId)
+        .then(setUploadedDocs)
+        .catch(() => setUploadedDocs([]))
+        .finally(() => setLoadingDocs(false));
+    }
+  }, [mode, instrumentId]);
+
+  // Notify parent of queued files (create mode)
+  useEffect(() => {
+    onQueuedFilesReady?.(queuedFiles);
+  }, [queuedFiles, onQueuedFilesReady]);
+
+  function addFiles(files: FileList | File[]) {
+    const arr = Array.from(files);
+    setQueuedFiles((prev) => [...prev, ...arr]);
+    // Generate object URL previews for images
+    const newPreviews = new Map(queuedPreviews);
+    for (const f of arr) {
+      if (f.type.startsWith("image/")) {
+        newPreviews.set(f, URL.createObjectURL(f));
+      }
+    }
+    setQueuedPreviews(newPreviews);
+  }
+
+  function removeQueuedFile(file: File) {
+    setQueuedFiles((prev) => prev.filter((f) => f !== file));
+    setQueuedPreviews((prev) => {
+      const next = new Map(prev);
+      const url = next.get(file);
+      if (url) URL.revokeObjectURL(url);
+      next.delete(file);
+      return next;
+    });
+  }
+
+  async function handleUploadNow(files: File[]) {
+    if (!instrumentId || files.length === 0) return;
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const uploaded: UploadedDocument[] = [];
+      for (const file of files) {
+        const doc = await uploadInstrumentDocument(instrumentId, file);
+        uploaded.push(doc);
+      }
+      setUploadedDocs((prev) => [...prev, ...uploaded]);
+      setQueuedFiles([]);
+      setQueuedPreviews(new Map());
+    } catch (err: any) {
+      setUploadError(err?.message || "Upload failed. Please try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDeleteUploaded(doc: UploadedDocument) {
+    if (!instrumentId) return;
+    try {
+      await deleteInstrumentDocument(instrumentId, doc.id);
+      setUploadedDocs((prev) => prev.filter((d) => d.id !== doc.id));
+    } catch (err: any) {
+      setUploadError(err?.message || "Failed to remove document.");
+    }
+  }
+
+  function handleDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files?.length) addFiles(e.dataTransfer.files);
+  }
+
+  function formatBytes(bytes?: number | null) {
+    if (!bytes) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Drop zone */}
+      <div
+        className={`rounded-md border-2 border-dashed transition-colors cursor-pointer ${
+          isDragging
+            ? "border-primary bg-primary/5"
+            : "border-border bg-muted/20 hover:border-primary/50"
+        } px-5 py-6 text-center`}
+        onClick={() => fileInputRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+        role="button"
+        tabIndex={0}
+        aria-label="Upload supporting documents"
+        onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept={ACCEPTED_TYPES}
+          className="hidden"
+          onChange={(e) => e.target.files && addFiles(e.target.files)}
+        />
+        <p className="text-xs font-medium text-foreground">
+          {isDragging ? "Drop files here…" : "Click or drag files to upload"}
+        </p>
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          Accepts photos (JPG, PNG, WebP), PDF, Word documents, plain text
+        </p>
+      </div>
+
+      {uploadError && (
+        <p className="text-xs text-destructive" role="alert">{uploadError}</p>
+      )}
+
+      {/* Queued files (pending upload — shown in both modes) */}
+      {queuedFiles.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {mode === "edit" ? "Ready to upload" : "Queued (will upload after save)"}
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {queuedFiles.map((file, idx) => {
+              const preview = queuedPreviews.get(file);
+              return (
+                <div key={idx} className="flex items-center gap-2 rounded border border-border bg-muted/30 p-2">
+                  {preview ? (
+                    <img src={preview} alt={file.name} className="h-10 w-10 rounded object-cover shrink-0 border border-border" />
+                  ) : (
+                    <div className="h-10 w-10 shrink-0 rounded border border-border bg-muted flex items-center justify-center text-[10px] text-muted-foreground font-mono uppercase">
+                      {file.name.split(".").pop()}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{file.name}</p>
+                    <p className="text-[10px] text-muted-foreground">{formatBytes(file.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeQueuedFile(file); }}
+                    className="shrink-0 h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors text-sm"
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+          {mode === "edit" && (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="h-8 text-xs"
+              disabled={uploading}
+              onClick={() => handleUploadNow(queuedFiles)}
+            >
+              {uploading ? "Uploading…" : `Upload ${queuedFiles.length} file${queuedFiles.length !== 1 ? "s" : ""}`}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Already-uploaded documents (edit mode) */}
+      {mode === "edit" && (
+        <div className="space-y-2">
+          {loadingDocs ? (
+            <p className="text-[11px] text-muted-foreground">Loading existing documents…</p>
+          ) : uploadedDocs.length > 0 ? (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Saved documents</p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {uploadedDocs.map((doc) => {
+                  const isImage = (doc.file_type || "").startsWith("image/");
+                  return (
+                    <div key={doc.id} className="flex items-center gap-2 rounded border border-border bg-muted/30 p-2">
+                      {isImage && doc.signed_url ? (
+                        <img
+                          src={doc.signed_url}
+                          alt={doc.file_name}
+                          className="h-10 w-10 rounded object-cover shrink-0 border border-border"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 shrink-0 rounded border border-border bg-muted flex items-center justify-center text-[10px] text-muted-foreground font-mono uppercase">
+                          {doc.file_name.split(".").pop()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {doc.signed_url ? (
+                          <a
+                            href={doc.signed_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs font-medium text-primary hover:underline truncate block"
+                          >
+                            {doc.file_name}
+                          </a>
+                        ) : (
+                          <p className="text-xs font-medium text-foreground truncate">{doc.file_name}</p>
+                        )}
+                        <p className="text-[10px] text-muted-foreground">{formatBytes(doc.file_size)}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteUploaded(doc)}
+                        className="shrink-0 h-6 w-6 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors text-sm"
+                        aria-label={`Remove ${doc.file_name}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          ) : (
+            <p className="text-[11px] text-muted-foreground italic">No documents uploaded yet.</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
   return (
@@ -206,6 +477,8 @@ export function InstrumentForm({
   onSubmit,
   isSubmitting,
   submitError,
+  instrumentId,
+  onQueuedFilesReady,
 }: InstrumentFormProps) {
   const {
     register,
@@ -722,18 +995,14 @@ export function InstrumentForm({
         </div>
       </section>
 
-      {/* ── Supporting Documents (placeholder) ───────── */}
+      {/* ── Supporting Documents ───────────────────── */}
       <section aria-labelledby="section-documents">
         <SectionHeading>Supporting Documents</SectionHeading>
-        <div className="rounded-md border border-dashed border-border bg-muted/30 px-5 py-6">
-          <p className="text-xs font-medium text-foreground">
-            Document Upload
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Document and photograph upload will be available in the evaluation
-            workflow.
-          </p>
-        </div>
+        <DocumentUploadSection
+          mode={mode}
+          instrumentId={instrumentId}
+          onQueuedFilesReady={onQueuedFilesReady}
+        />
       </section>
 
       {/* ── Submit ───────────────────────────────────── */}
@@ -755,7 +1024,7 @@ export function InstrumentForm({
           type="submit"
           id="instrument-form-submit"
           disabled={isSubmitting}
-          className="h-9 w-full sm:w-auto sm:min-w-[200px] text-sm"
+          className="h-9 w-full sm:w-auto sm:min-w-50 text-sm"
         >
           {isSubmitting ? submittingLabel : submitLabel}
         </Button>

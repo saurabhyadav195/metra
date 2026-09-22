@@ -24,6 +24,7 @@ import EvaluationResultsPage from '@/pages/evaluations/EvaluationResultsPage'
 
 import ReportsPage from '@/pages/reports/ReportsPage'
 import ReportDetailPage from '@/pages/reports/ReportDetailPage'
+import VerifyPage from '@/pages/verify/VerifyPage'
 
 import TeamPage from '@/pages/team/TeamPage'
 import SettingsPage from '@/pages/settings/SettingsPage'
@@ -57,9 +58,10 @@ export default function App() {
       <AuthProvider>
         <ErrorBoundary>
           <Routes>
-            {/* Public authentication routes */}
+            {/* Public authentication and verification routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/verify/:reportId" element={<VerifyPage />} />
 
             {/* Protected application space */}
             <Route path="/app" element={<ProtectedRoute />}>

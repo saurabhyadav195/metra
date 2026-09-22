@@ -22,11 +22,9 @@ type FilterTab = "all" | string;
 
 const TABS: { label: string; value: FilterTab }[] = [
   { label: "All", value: "all" },
-  { label: "Draft", value: "DRAFT" },
   { label: "In Progress", value: "IN_PROGRESS" },
-  { label: "Completed", value: "COMPLETED" },
-  { label: "Passed", value: "PASSED" },
-  { label: "Failed", value: "FAILED" },
+  { label: "Pending Verification", value: "PENDING_VERIFICATION" },
+  { label: "Approved", value: "APPROVED" },
 ];
 
 export default function EvaluationsPage() {
@@ -46,7 +44,11 @@ export default function EvaluationsPage() {
 
   const filtered = evaluations.filter((ev) => {
     if (activeTab === "all") return true;
-    return ev.status === activeTab;
+    const st = String(ev.status || "").toUpperCase();
+    if (activeTab === "IN_PROGRESS") {
+      return st === "IN_PROGRESS" || st === "DRAFT" || st === "REQUIRES_REWORK";
+    }
+    return st === activeTab;
   });
 
   const formatDate = (dateStr?: string | null) => {
@@ -82,7 +84,12 @@ export default function EvaluationsPage() {
             const count =
               tab.value === "all"
                 ? evaluations.length
-                : evaluations.filter((e) => e.status === tab.value).length;
+                : tab.value === "IN_PROGRESS"
+                ? evaluations.filter((e) => {
+                    const st = String(e.status || "").toUpperCase();
+                    return st === "IN_PROGRESS" || st === "DRAFT" || st === "REQUIRES_REWORK";
+                  }).length
+                : evaluations.filter((e) => String(e.status || "").toUpperCase() === tab.value).length;
 
             return (
               <button
@@ -186,7 +193,7 @@ export default function EvaluationsPage() {
                         onClick={() => navigate(`/app/evaluations/${ev.id}`)}
                         className="text-xs"
                       >
-                        {ev.status === "IN_PROGRESS" || ev.status === "DRAFT"
+                        {["IN_PROGRESS", "DRAFT", "REQUIRES_REWORK"].includes(String(ev.status || "").toUpperCase())
                           ? "Continue"
                           : "View"}
                       </Button>

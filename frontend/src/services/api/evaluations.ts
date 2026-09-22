@@ -92,10 +92,22 @@ export function completeTest(
   );
 }
 
-// ─── Finalization ─────────────────────────────────────────────────────────────
+// ─── Finalization & Approval Workflow ─────────────────────────────────────────
 
 export function finalizeEvaluation(evaluationId: string): Promise<Evaluation> {
   return apiPost<Evaluation>(`/api/evaluations/${evaluationId}/evaluate`, {});
+}
+
+export function submitForApproval(evaluationId: string): Promise<Evaluation> {
+  return apiPost<Evaluation>(`/api/evaluations/${evaluationId}/submit`, {});
+}
+
+export function approveEvaluation(evaluationId: string): Promise<Evaluation> {
+  return apiPost<Evaluation>(`/api/evaluations/${evaluationId}/approve`, {});
+}
+
+export function rejectEvaluation(evaluationId: string, reason: string): Promise<Evaluation> {
+  return apiPost<Evaluation>(`/api/evaluations/${evaluationId}/reject`, { reason });
 }
 
 // ─── Report Data ─────────────────────────────────────────────────────────────

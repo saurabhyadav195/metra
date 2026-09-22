@@ -2,6 +2,14 @@
  * METRA — pages/evaluations/EvaluationResultsPage.tsx
  * Route: /app/evaluations/:evaluationId/results
  * Steps 4 & 5: Compliance Summary, Rule Traceability, and Evaluation Finalization.
+ *
+ * STATUS DISPLAY RULES (critical — do not regress):
+ *   NOT_STARTED    → "Not Started" badge, no result badge (unexecuted tests must NEVER show PASS)
+ *   NOT_APPLICABLE → "N/A" badge, no result badge
+ *   PASS           → StatusBadge + ResultBadge(PASS)
+ *   FAIL           → StatusBadge + ResultBadge(FAIL)
+ *   IN_PROGRESS    → "In Progress" badge, no result badge
+ *   MANUAL_REVIEW  → "Manual Review" badge, no result badge
  */
 
 import { useEffect, useState } from "react";
@@ -9,9 +17,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Tick02Icon,
-  FileTextIcon,
-  ArrowRight01Icon,
-  AlertCircleIcon,
 } from "@hugeicons/core-free-icons";
 
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -23,6 +28,11 @@ import { Button } from "@/components/ui/button";
 import { getEvaluation, finalizeEvaluation } from "@/services/api/evaluations";
 import { LoadingState } from "@/components/common/EmptyState";
 import type { Evaluation, EvaluationStatus } from "@/types/evaluation";
+
+// Statuses that represent "test was actually executed and has a binary result"
+const EXECUTED_WITH_RESULT = new Set(["PASS", "FAIL"]);
+// Statuses where no result badge should be shown
+const NO_RESULT_STATUSES = new Set(["NOT_STARTED", "NOT_APPLICABLE", "IN_PROGRESS", "MANUAL_REVIEW", "PENDING"]);
 
 export default function EvaluationResultsPage() {
   const { evaluationId } = useParams<{ evaluationId: string }>();
@@ -48,8 +58,8 @@ export default function EvaluationResultsPage() {
     setErrorMessage(null);
     try {
       await finalizeEvaluation(evaluationId);
-      // Navigate to reports page upon finalization
-      navigate("/app/reports");
+      // Navigate to the report detail page upon finalization
+      navigate(`/app/reports/${evaluationId}`);
     } catch (err: any) {
       console.error("Finalize error:", err);
       setErrorMessage(err?.message || "Failed to finalize evaluation.");
@@ -59,8 +69,22 @@ export default function EvaluationResultsPage() {
   };
 
   const overallResultStr = typeof evaluation?.overall_result === "object"
-    ? (evaluation?.overall_result as any)?.result
-    : evaluation?.overall_result || "PASS";
+    ? (evaluation?.overall_result as any)?.result || (evaluation?.overall_result as any)?.status
+    : evaluation?.overall_result;
+
+  /** Return the correct result badge value for a test row, or null if no result to show. */
+  function resolveTestResult(tr: any): string | null {
+    const statusUpper = String(tr.status || "").toUpperCase();
+
+    // These tests were never executed — do NOT show any result badge
+    if (NO_RESULT_STATUSES.has(statusUpper)) return null;
+
+    // For executed tests, prefer manual_result if set, else use status
+    if (tr.manual_result) return String(tr.manual_result).toUpperCase();
+    if (EXECUTED_WITH_RESULT.has(statusUpper)) return statusUpper;
+
+    return null;
+  }
 
   return (
     <AppLayout>
@@ -88,6 +112,16 @@ export default function EvaluationResultsPage() {
             </div>
           )}
 
+          {/* Rejection Banner */}
+          {(evaluation?.status === "REQUIRES_REWORK" || (evaluation?.notes || "").startsWith("[REJECTED")) && (
+            <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 p-4 text-rose-800 dark:text-rose-300">
+              <h4 className="font-semibold text-sm">Evaluation Returned for Rework</h4>
+              <p className="text-xs mt-1 leading-relaxed">
+                {evaluation?.notes || "This evaluation was rejected during manager verification and requires corrections before approval."}
+              </p>
+            </div>
+          )}
+
           {/* Banner Summary */}
           <div className="rounded-lg border border-border bg-card p-6 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
@@ -103,7 +137,7 @@ export default function EvaluationResultsPage() {
             </div>
             <div className="flex items-center gap-3">
               <StatusBadge status={(evaluation?.status as EvaluationStatus) || "DRAFT"} />
-              <ResultBadge result={(overallResultStr as any) || "PASS"} />
+              {overallResultStr && <ResultBadge result={overallResultStr} />}
             </div>
           </div>
 
@@ -128,33 +162,83 @@ export default function EvaluationResultsPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {evaluation.test_results.map((tr) => (
-                      <tr key={tr.id} className="hover:bg-muted/20">
-                        <td className="py-2.5 px-3 font-medium text-foreground">{tr.test_name}</td>
-                        <td className="py-2.5 px-3 font-mono text-muted-foreground">{tr.clause || "A.4"}</td>
-                        <td className="py-2.5 px-3">
-                          <StatusBadge status={tr.status as any} size="sm" />
-                        </td>
-                        <td className="py-2.5 px-3 text-right">
-                          <ResultBadge result={(tr.manual_result as any) || "PASS"} size="sm" />
-                        </td>
-                      </tr>
-                    ))}
+                    {evaluation.test_results.map((tr) => {
+                      const resultVal = resolveTestResult(tr);
+                      return (
+                        <tr key={tr.id} className="hover:bg-muted/20">
+                          <td className="py-2.5 px-3 font-medium text-foreground">{tr.test_name}</td>
+                          <td className="py-2.5 px-3 font-mono text-muted-foreground">{tr.clause || "A.4"}</td>
+                          <td className="py-2.5 px-3">
+                            <StatusBadge status={tr.status as any} size="sm" />
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            {resultVal ? (
+                              <ResultBadge result={resultVal} size="sm" />
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
           </SectionCard>
 
+          {/* Evaluation summary counts */}
+          {evaluation?.test_results && evaluation.test_results.length > 0 && (() => {
+            const tests = evaluation.test_results;
+            const applicable = tests.filter(t =>
+              String(t.status || "").toUpperCase() !== "NOT_APPLICABLE"
+            );
+            const passed = applicable.filter(t => String(t.status || "").toUpperCase() === "PASS").length;
+            const failed = applicable.filter(t => String(t.status || "").toUpperCase() === "FAIL").length;
+            const pending = applicable.filter(t =>
+              !["PASS", "FAIL"].includes(String(t.status || "").toUpperCase())
+            ).length;
+            const na = tests.filter(t => String(t.status || "").toUpperCase() === "NOT_APPLICABLE").length;
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {[
+                  { label: "Passed", value: passed, color: "text-emerald-600" },
+                  { label: "Failed", value: failed, color: "text-rose-600" },
+                  { label: "Pending / Not Started", value: pending, color: "text-amber-600" },
+                  { label: "Not Applicable", value: na, color: "text-muted-foreground" },
+                ].map(({ label, value, color }) => (
+                  <div key={label} className="rounded-lg border border-border bg-card p-4 text-center">
+                    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{label}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
           {/* Finalization Actions */}
           <div className="flex justify-between items-center pt-4">
             <Button variant="outline" size="sm" onClick={() => navigate(`/app/evaluations/${evaluationId}/tests`)}>
               Back to Tests
             </Button>
-            <Button size="sm" onClick={handleFinalize} disabled={finalizing} className="gap-1.5">
-              <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-4" />
-              {finalizing ? "Finalizing..." : "Finalize & Generate Report"}
-            </Button>
+
+            {evaluation?.status === "APPROVED" ? (
+              <Button size="sm" disabled className="gap-1.5 bg-emerald-600 text-white">
+                <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-4" />
+                Approved & Locked
+              </Button>
+            ) : evaluation?.status === "PENDING_VERIFICATION" ? (
+              <Button size="sm" disabled className="gap-1.5 bg-blue-600 text-white">
+                <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-4" />
+                Pending Verification
+              </Button>
+            ) : (
+              <Button size="sm" onClick={handleFinalize} disabled={finalizing} className="gap-1.5">
+                <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-4" />
+                {finalizing ? "Finalizing..." : "Finalize & Generate Report"}
+              </Button>
+            )}
           </div>
         </div>
       )}
