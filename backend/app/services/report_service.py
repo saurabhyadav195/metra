@@ -22,25 +22,28 @@ class ReportService:
         evaluation = await self.eval_service.get_evaluation_detail(evaluation_id, caller)
         instrument = evaluation.get("instruments") or {}
 
-        # 1. Fetch Laboratory Profile from database using caller's laboratory_id
-        lab_name = "National Metrology Laboratory"
+        # 1. Fetch Laboratory Profile from database using evaluation's laboratory_id (with caller fallback)
+        eval_lab_id = evaluation.get("laboratory_id") or (caller.laboratory_id if caller else None)
+        lab_name = "Unknown Laboratory"
         lab_code = None
         lab_address = None
         lab_contact_email = None
         lab_contact_phone = None
         lab_accreditation = None
-        try:
-            lab_res = self.client.table("laboratories").select("*").eq("id", caller.laboratory_id).execute()
-            if lab_res.data:
-                lab_info = lab_res.data[0]
-                lab_name = lab_info.get("name") or lab_name
-                lab_code = lab_info.get("code")
-                lab_address = lab_info.get("address")
-                lab_contact_email = lab_info.get("contact_email")
-                lab_contact_phone = lab_info.get("contact_phone")
-                lab_accreditation = lab_info.get("accreditation_number")
-        except Exception:
-            pass
+        if eval_lab_id:
+            try:
+                lab_res = self.client.table("laboratories").select("*").eq("id", eval_lab_id).execute()
+                if lab_res.data:
+                    lab_info = lab_res.data[0]
+                    lab_name = lab_info.get("name") or lab_name
+                    lab_code = lab_info.get("code")
+                    lab_address = lab_info.get("address")
+                    lab_contact_email = lab_info.get("contact_email")
+                    lab_contact_phone = lab_info.get("contact_phone")
+                    lab_accreditation = lab_info.get("registration_number") or lab_info.get("accreditation_number")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"[ReportService] Failed to fetch laboratory {eval_lab_id}: {e}")
 
         # 2. Resolve Evaluator ("Evaluated By") strictly from profiles table using engineer_id
         evaluator_id = evaluation.get("engineer_id")

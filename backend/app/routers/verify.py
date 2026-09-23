@@ -69,7 +69,7 @@ async def verify_certificate(
     lab_id = ev.get("laboratory_id")
     eval_status = str(ev.get("status", "")).upper()
 
-    # 2. Fetch laboratory name & accreditation
+    # 2. Fetch laboratory name & registration/accreditation number directly using evaluation.laboratory_id
     lab_name = "Unknown Laboratory"
     lab_accreditation = None
 
@@ -77,17 +77,19 @@ async def verify_certificate(
         try:
             lab_res = (
                 client.table("laboratories")
-                .select("name, accreditation_number")
+                .select("id, name, registration_number, address, city, state, country, email, phone")
                 .eq("id", lab_id)
                 .execute()
             )
             if lab_res.data and len(lab_res.data) > 0:
-                lab_name = lab_res.data[0].get("name") or lab_name
-                lab_accreditation = lab_res.data[0].get("accreditation_number")
-        except Exception:
-            pass
+                lab_row = lab_res.data[0]
+                lab_name = lab_row.get("name") or lab_name
+                lab_accreditation = lab_row.get("registration_number") or lab_row.get("accreditation_number")
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"[verify_certificate] Failed to fetch laboratory {lab_id}: {e}")
 
-    # If lab_id was missing on evaluation or returned Unknown Laboratory, try resolving via engineer profile
+    # Fallback if evaluation.laboratory_id is missing or returned empty
     if lab_name == "Unknown Laboratory":
         creator_id = ev.get("engineer_id") or ev.get("created_by")
         if creator_id:
@@ -103,15 +105,17 @@ async def verify_certificate(
                     if resolved_lab_id:
                         lab_res = (
                             client.table("laboratories")
-                            .select("name, accreditation_number")
+                            .select("id, name, registration_number, address, city, state, country, email, phone")
                             .eq("id", resolved_lab_id)
                             .execute()
                         )
                         if lab_res.data and len(lab_res.data) > 0:
-                            lab_name = lab_res.data[0].get("name") or lab_name
-                            lab_accreditation = lab_res.data[0].get("accreditation_number")
-            except Exception:
-                pass
+                            lab_row = lab_res.data[0]
+                            lab_name = lab_row.get("name") or lab_name
+                            lab_accreditation = lab_row.get("registration_number") or lab_row.get("accreditation_number")
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).error(f"[verify_certificate] Failed profile fallback lab lookup: {e}")
 
     # 3. Resolve evaluator (original engineer who ran the evaluation)
     evaluator_name = "Unknown"
