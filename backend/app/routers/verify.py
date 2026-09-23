@@ -72,19 +72,46 @@ async def verify_certificate(
     # 2. Fetch laboratory name & accreditation
     lab_name = "Unknown Laboratory"
     lab_accreditation = None
-    try:
-        lab_res = (
-            client.table("laboratories")
-            .select("name, accreditation_number")
-            .eq("id", lab_id)
-            .single()
-            .execute()
-        )
-        if lab_res.data:
-            lab_name = lab_res.data.get("name") or lab_name
-            lab_accreditation = lab_res.data.get("accreditation_number")
-    except Exception:
-        pass
+
+    if lab_id:
+        try:
+            lab_res = (
+                client.table("laboratories")
+                .select("name, accreditation_number")
+                .eq("id", lab_id)
+                .execute()
+            )
+            if lab_res.data and len(lab_res.data) > 0:
+                lab_name = lab_res.data[0].get("name") or lab_name
+                lab_accreditation = lab_res.data[0].get("accreditation_number")
+        except Exception:
+            pass
+
+    # If lab_id was missing on evaluation or returned Unknown Laboratory, try resolving via engineer profile
+    if lab_name == "Unknown Laboratory":
+        creator_id = ev.get("engineer_id") or ev.get("created_by")
+        if creator_id:
+            try:
+                prof_lab_res = (
+                    client.table("profiles")
+                    .select("laboratory_id")
+                    .eq("id", creator_id)
+                    .execute()
+                )
+                if prof_lab_res.data and len(prof_lab_res.data) > 0:
+                    resolved_lab_id = prof_lab_res.data[0].get("laboratory_id")
+                    if resolved_lab_id:
+                        lab_res = (
+                            client.table("laboratories")
+                            .select("name, accreditation_number")
+                            .eq("id", resolved_lab_id)
+                            .execute()
+                        )
+                        if lab_res.data and len(lab_res.data) > 0:
+                            lab_name = lab_res.data[0].get("name") or lab_name
+                            lab_accreditation = lab_res.data[0].get("accreditation_number")
+            except Exception:
+                pass
 
     # 3. Resolve evaluator (original engineer who ran the evaluation)
     evaluator_name = "Unknown"

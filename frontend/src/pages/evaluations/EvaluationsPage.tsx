@@ -145,19 +145,25 @@ export default function EvaluationsPage() {
             <table className="w-full text-sm" role="table">
               <thead>
                 <tr className="border-b border-border bg-muted/70">
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
+                  <th className="w-[17%] px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Evaluation ID
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
+                  <th className="w-[18%] px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
+                    Model
+                  </th>
+                  <th className="w-[18%] px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
+                    Serial No
+                  </th>
+                  <th className="w-[15%] px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     OIML Edition
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
+                  <th className="w-[13%] px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Status
                   </th>
-                  <th className="hidden px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide lg:table-cell">
+                  <th className="w-[10%] hidden px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide lg:table-cell">
                     Created
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wide">
+                  <th className="w-[9%] px-4 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wide">
                     Action
                   </th>
                 </tr>
@@ -168,25 +174,31 @@ export default function EvaluationsPage() {
                     key={ev.id}
                     className="hover:bg-accent/50 transition-colors"
                   >
-                    <td className="px-4 py-3">
+                    <td className="w-[17%] px-4 py-3 whitespace-nowrap">
                       <span className="font-mono text-xs font-medium text-foreground">
                         {(ev as any).evaluation_number || `EVL-${strId(ev.id)}`}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-xs text-foreground font-medium">
+                    <td className="w-[18%] px-4 py-3 text-xs text-foreground font-medium whitespace-nowrap">
+                      {ev.instruments?.model || (ev as any).instrument_model || "—"}
+                    </td>
+                    <td className="w-[18%] px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
+                      {ev.instruments?.serial_number || (ev as any).serial_number || "—"}
+                    </td>
+                    <td className="w-[15%] px-4 py-3 text-xs text-foreground font-medium whitespace-nowrap">
                       {ev.oiml_edition || "2006 (E)"}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="w-[13%] px-4 py-3 whitespace-nowrap">
                       <StatusBadge
                         type="evaluation"
                         status={ev.status as EvaluationStatus}
                         size="sm"
                       />
                     </td>
-                    <td className="hidden px-4 py-3 text-xs text-muted-foreground lg:table-cell">
+                    <td className="w-[10%] hidden px-4 py-3 text-xs text-muted-foreground lg:table-cell whitespace-nowrap">
                       {formatDate(ev.created_at)}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="w-[9%] px-4 py-3 text-right whitespace-nowrap">
                       <Button
                         variant="ghost"
                         size="sm"
