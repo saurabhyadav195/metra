@@ -18,7 +18,7 @@ import { toast } from "sonner";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/common/PageHeader";
-import { StatusBadge, ResultBadge } from "@/components/common/StatusBadge";
+import { StatusBadge } from "@/components/common/StatusBadge";
 import { EmptyState, LoadingState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,7 +41,6 @@ export default function ReportsPage() {
   const [rejectReason, setRejectReason] = useState("");
 
   const loadData = () => {
-    setLoading(true);
     listReports()
       .then(setReports)
       .catch((err) => {
@@ -140,9 +139,6 @@ export default function ReportsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
                     Status
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-foreground uppercase tracking-wide">
-                    Result
-                  </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-foreground uppercase tracking-wide">
                     Actions
                   </th>
@@ -156,32 +152,29 @@ export default function ReportsPage() {
 
                   return (
                     <tr key={rpt.id} className="hover:bg-accent/50 transition-colors">
-                      <td className="px-4 py-3 font-mono text-xs font-medium text-foreground">
+                      <td className="px-4 py-3 font-mono text-xs font-medium text-foreground whitespace-nowrap">
                         {rpt.id}
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground text-xs">
                         {rpt.instrument_manufacturer} {rpt.instrument_model}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground whitespace-nowrap">
                         {rpt.serial_number}
                       </td>
-                      <td className="px-4 py-3 text-xs text-foreground font-medium">
+                      <td className="px-4 py-3 text-xs text-foreground font-medium whitespace-nowrap">
                         {rpt.generated_by}
                       </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
+                      <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                         {formatDate(rpt.generated_at)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <StatusBadge
                           type="evaluation"
                           status={rpt.evaluation_status || rpt.status}
                           size="sm"
                         />
                       </td>
-                      <td className="px-4 py-3">
-                        <ResultBadge result={(rpt.overall_result as any) || "PENDING"} size="sm" />
-                      </td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <Button
                             variant="ghost"

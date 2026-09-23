@@ -16,7 +16,6 @@ export interface ReportListItem {
   generated_at: string;
   status: string;
   evaluation_status?: string;
-  overall_result?: string;
 }
 
 export function listReports(): Promise<ReportListItem[]> {

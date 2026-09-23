@@ -28,7 +28,6 @@ class ReportListItem(BaseModel):
     generated_at: str
     status: str
     evaluation_status: str      # Actual evaluation status for role-gated UI actions
-    overall_result: Optional[str] = None
 
 
 class ApproveRejectPayload(BaseModel):
@@ -48,8 +47,6 @@ async def list_reports(
     """
     # Only surface evaluations that have completed the report generation workflow.
     # IN_PROGRESS evaluations must NEVER appear in the Reports dashboard.
-    # Only surface evaluations that have completed the report generation workflow.
-    # in_progress evaluations must NEVER appear in the Reports dashboard.
     REPORT_VISIBLE_STATUSES = [
         "pending_verification", "approved", "requires_rework",
         "PENDING_VERIFICATION", "APPROVED", "REQUIRES_REWORK",
@@ -93,11 +90,6 @@ async def list_reports(
     for ev in evals:
         inst = ev.get("instruments") or {}
         model_name = inst.get("model") or "N/A"
-        overall_res = None
-        if isinstance(ev.get("overall_result"), dict):
-            overall_res = ev.get("overall_result").get("result") or ev.get("overall_result").get("status")
-        elif isinstance(ev.get("overall_result"), str):
-            overall_res = ev.get("overall_result")
 
         # Resolve engineer name strictly from bulk-fetched profiles map via engineer_id
         eng_id = ev.get("engineer_id")
@@ -117,7 +109,6 @@ async def list_reports(
                 generated_at=ev.get("completed_at") or ev.get("updated_at") or ev.get("created_at") or "",
                 status=eval_status,
                 evaluation_status=eval_status,
-                overall_result=overall_res,
             )
         )
 

@@ -426,6 +426,7 @@ class ReportPdfGenerator:
             qr.make(fit=True)
             qr_img = qr.make_image(fill_color="black", back_color="white")
             qr_buf = io.BytesIO()
+            # pyre-ignore[unexpected-keyword]
             qr_img.save(qr_buf, format="PNG")
             qr_buf.seek(0)
             qr_flowable = RLImage(qr_buf, width=0.95 * inch, height=0.95 * inch)

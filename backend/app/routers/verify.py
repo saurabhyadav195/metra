@@ -23,6 +23,7 @@ class CertificateVerificationResponse(BaseModel):
     verified: bool
     evaluation_id: str
     laboratory_name: str
+    laboratory_accreditation: Optional[str] = None
     instrument_manufacturer: str
     instrument_model: str
     serial_number: str
@@ -68,18 +69,20 @@ async def verify_certificate(
     lab_id = ev.get("laboratory_id")
     eval_status = str(ev.get("status", "")).upper()
 
-    # 2. Fetch laboratory name
+    # 2. Fetch laboratory name & accreditation
     lab_name = "Unknown Laboratory"
+    lab_accreditation = None
     try:
         lab_res = (
             client.table("laboratories")
-            .select("name")
+            .select("name, accreditation_number")
             .eq("id", lab_id)
             .single()
             .execute()
         )
         if lab_res.data:
             lab_name = lab_res.data.get("name") or lab_name
+            lab_accreditation = lab_res.data.get("accreditation_number")
     except Exception:
         pass
 
@@ -151,19 +154,16 @@ async def verify_certificate(
     is_approved = eval_status == "APPROVED"
     if is_approved:
         verification_message = (
-            f"✅ AUTHENTIC & APPROVED — This certificate has been officially approved by "
-            f"{approver_name or 'an authorized signatory'} of {lab_name}. "
-            f"The instrument evaluation result is {overall_result}."
+            f"This report was verified against the METRA laboratory record. "
+            f"Approved by {approver_name or 'an authorized signatory'} of {lab_name}."
         )
-    elif eval_status == "PENDING_VERIFICATION":
+    elif eval_status in ("PENDING_VERIFICATION", "PENDING"):
         verification_message = (
-            "⏳ PENDING APPROVAL — This evaluation is awaiting official approval by an authorized signatory. "
-            "The certificate is not yet fully authorized."
+            "This evaluation report is awaiting official verification from the laboratory."
         )
     else:
         verification_message = (
-            f"⚠️ NOT APPROVED — This evaluation certificate has status '{eval_status}' "
-            "and has not been officially approved."
+            f"This evaluation report has status '{eval_status}' and has not been approved."
         )
 
     eval_id_short = str(evaluation_id)[:8].upper()
@@ -174,6 +174,7 @@ async def verify_certificate(
         verified=is_approved,
         evaluation_id=evaluation_id,
         laboratory_name=lab_name,
+        laboratory_accreditation=lab_accreditation,
         instrument_manufacturer=inst.get("manufacturer") or "N/A",
         instrument_model=inst.get("model") or "N/A",
         serial_number=inst.get("serial_number") or "N/A",
