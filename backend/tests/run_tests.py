@@ -22,7 +22,8 @@ from tests.test_rule_engine import (
     test_result_builder_and_status_verdict,
     test_stability_of_equilibrium_evaluation,
     test_voltage_variations_evaluation,
-    test_endurance_evaluation
+    test_endurance_evaluation,
+    test_laboratory_code_settings_and_models,
 )
 
 if __name__ == "__main__":
@@ -61,4 +62,6 @@ if __name__ == "__main__":
     print(" [x] Voltage Variations (TEST-A.5.4) Evaluation test passed")
     test_endurance_evaluation()
     print(" [x] Endurance Test (TEST-A.6) Evaluation test passed")
-    print("\nSUCCESS: All 17 Rule Engine tests passed cleanly!")
+    test_laboratory_code_settings_and_models()
+    print(" [x] Laboratory Code & Settings API test passed")
+    print("\nSUCCESS: All 18 Rule Engine & Settings tests passed cleanly!")

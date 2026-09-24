@@ -46,7 +46,11 @@ export default function AdminDashboard() {
       <div className="space-y-6">
         <PageHeader
           title={`Admin Console — ${profile?.full_name ?? "Administrator"}`}
-          description="Laboratory Evaluation Monitoring & Compliance Management"
+          description={
+            stats?.laboratory_name
+              ? `${stats.laboratory_name} Evaluation Monitoring & Compliance`
+              : "Laboratory Evaluation Monitoring & Compliance Management"
+          }
           actions={
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => navigate("/app/evaluations")}>

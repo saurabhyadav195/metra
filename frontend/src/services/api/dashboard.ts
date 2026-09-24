@@ -11,6 +11,7 @@ export interface DashboardStats {
   total_instruments: number;
   total_reports: number;
   engineers_count: number;
+  laboratory_name?: string;
   recent_evaluations: Array<{
     id: string;
     evaluation_number: string;

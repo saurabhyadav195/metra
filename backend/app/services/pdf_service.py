@@ -197,7 +197,7 @@ class ReportPdfGenerator:
         # ── 1. HEADER & LETTERHEAD ──────────────────────────────────────────
         lab_name = (lab.get("name") or "NATIONAL METROLOGY EVALUATION LABORATORY").upper()
         lab_address = lab.get("address") or ""
-        accreditation = lab.get("accreditation_number") or ""
+        accreditation = lab.get("accreditation_number") or lab.get("registration_number") or ""
 
         report_num = eval_info.get("report_number") or f"TR-{str(eval_info.get('id', ''))[:8].upper()}-2026"
         eval_num = eval_info.get("evaluation_number") or f"EVL-{str(eval_info.get('id', ''))[:8].upper()}"

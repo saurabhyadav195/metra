@@ -8,7 +8,7 @@ import { apiGet, apiPatch } from "./client";
 export interface LabSettings {
   id: string;
   name: string;
-  code?: string;
+  laboratory_code?: string;
   address?: string;
   contact_email?: string;
   contact_phone?: string;

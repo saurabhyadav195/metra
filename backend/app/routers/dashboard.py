@@ -21,6 +21,7 @@ class DashboardStatsResponse(BaseModel):
     total_instruments: int
     total_reports: int
     engineers_count: int
+    laboratory_name: Optional[str] = None
     recent_evaluations: List[Dict[str, Any]]
     recent_activity: List[Dict[str, Any]]
 
@@ -30,6 +31,17 @@ async def get_dashboard_stats(
     caller: AuthenticatedUser = Depends(get_authenticated_user),
     client: Client = Depends(get_supabase_client),
 ):
+    # 0. Fetch laboratory name for caller's laboratory_id
+    lab_name = None
+    if caller.laboratory_id:
+        try:
+            lab_res = client.table("laboratories").select("name").eq("id", caller.laboratory_id).execute()
+            if lab_res.data and lab_res.data[0].get("name"):
+                lab_name = lab_res.data[0]["name"]
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"[get_dashboard_stats] Laboratory lookup error for {caller.laboratory_id}: {e}")
+
     # 1. Instruments for caller's laboratory
     inst_res = (
         client.table("instruments")
@@ -116,6 +128,7 @@ async def get_dashboard_stats(
         total_instruments=total_instruments,
         total_reports=total_reports,
         engineers_count=engineers_count,
+        laboratory_name=lab_name,
         recent_evaluations=recent_evaluations,
         recent_activity=recent_activity,
     )

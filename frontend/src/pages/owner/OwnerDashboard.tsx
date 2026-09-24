@@ -47,7 +47,11 @@ export default function OwnerDashboard() {
       <div className="space-y-6">
         <PageHeader
           title={`Executive Portal — ${profile?.full_name ?? "Laboratory Owner"}`}
-          description="National Metrology Laboratory Management & Operations"
+          description={
+            stats?.laboratory_name
+              ? `${stats.laboratory_name} Management & Operations`
+              : "Laboratory Management & Operations"
+          }
           actions={
             <div className="flex items-center gap-2">
               <Button size="sm" onClick={() => navigate("/app/settings")}>

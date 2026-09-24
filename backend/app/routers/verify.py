@@ -84,7 +84,7 @@ async def verify_certificate(
             if lab_res.data and len(lab_res.data) > 0:
                 lab_row = lab_res.data[0]
                 lab_name = lab_row.get("name") or lab_name
-                lab_accreditation = lab_row.get("registration_number") or lab_row.get("accreditation_number")
+                lab_accreditation = lab_row.get("registration_number")
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"[verify_certificate] Failed to fetch laboratory {lab_id}: {e}")
@@ -112,7 +112,7 @@ async def verify_certificate(
                         if lab_res.data and len(lab_res.data) > 0:
                             lab_row = lab_res.data[0]
                             lab_name = lab_row.get("name") or lab_name
-                            lab_accreditation = lab_row.get("registration_number") or lab_row.get("accreditation_number")
+                            lab_accreditation = lab_row.get("registration_number")
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).error(f"[verify_certificate] Failed profile fallback lab lookup: {e}")

@@ -36,11 +36,11 @@ class ReportService:
                 if lab_res.data:
                     lab_info = lab_res.data[0]
                     lab_name = lab_info.get("name") or lab_name
-                    lab_code = lab_info.get("code")
+                    lab_code = lab_info.get("laboratory_code")
                     lab_address = lab_info.get("address")
-                    lab_contact_email = lab_info.get("contact_email")
-                    lab_contact_phone = lab_info.get("contact_phone")
-                    lab_accreditation = lab_info.get("registration_number") or lab_info.get("accreditation_number")
+                    lab_contact_email = lab_info.get("email")
+                    lab_contact_phone = lab_info.get("phone")
+                    lab_accreditation = lab_info.get("registration_number")
             except Exception as e:
                 import logging
                 logging.getLogger(__name__).error(f"[ReportService] Failed to fetch laboratory {eval_lab_id}: {e}")
@@ -112,6 +112,7 @@ class ReportService:
             "laboratory": {
                 "id": caller.laboratory_id,
                 "name": lab_name,
+                "laboratory_code": lab_code,
                 "code": lab_code,
                 "address": lab_address,
                 "contact_email": lab_contact_email,

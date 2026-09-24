@@ -10,11 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 import { useAuth } from "@/hooks/use-auth";
-import { signUpWithEmail } from "@/services/supabase/auth";
-import {
-  createLaboratory,
-  createOwnerProfile,
-} from "@/services/supabase/laboratories";
+import { signInWithEmail } from "@/services/supabase/auth";
+import { registerLaboratory } from "@/services/supabase/laboratories";
 
 /* ── Form schema ─────────────────────────────────── */
 
@@ -56,25 +53,6 @@ const registerSchema = z
   });
 
 type RegisterFormValues = z.infer<typeof registerSchema>;
-
-/* ── Error message mapping ───────────────────────── */
-
-function getRegistrationError(message: string): string {
-  const lower = message.toLowerCase();
-  if (lower.includes("already registered") || lower.includes("already exists")) {
-    return "An account with this email already exists.";
-  }
-  if (lower.includes("invalid email")) {
-    return "Please enter a valid email address.";
-  }
-  if (lower.includes("weak password") || lower.includes("password")) {
-    return "Password is too weak. Use at least 8 characters.";
-  }
-  if (lower.includes("fetch") || lower.includes("network")) {
-    return "Unable to reach the server. Check your connection and try again.";
-  }
-  return "Unable to create the laboratory account. Please try again.";
-}
 
 /* ── Section heading ─────────────────────────────── */
 
@@ -127,6 +105,7 @@ export default function RegisterPage() {
   const { isAuthenticated, profile } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const {
     register,
@@ -156,67 +135,62 @@ export default function RegisterPage() {
   const onSubmit = async (data: RegisterFormValues) => {
     setIsSubmitting(true);
     setFormError(null);
+    setSuccessMessage(null);
 
-    // Step 1: Create Supabase Auth account
-    const { data: authData, error: authError } = await signUpWithEmail(
+    // ── Step 1: Call backend registration endpoint ─────────────────────────
+    // The backend atomically creates:
+    //   auth.users → laboratories → profiles (role=owner)
+    // using the service-role key. No secrets leak to the browser.
+    const result = await registerLaboratory({
+      lab_name: data.lab_name,
+      lab_license: data.lab_license,
+      lab_address: data.lab_address,
+      lab_city: data.lab_city,
+      lab_state: data.lab_state,
+      lab_country: data.lab_country ?? "India",
+      lab_email: data.lab_email,
+      lab_phone: data.lab_phone,
+      owner_name: data.owner_name,
+      owner_email: data.owner_email,
+      owner_password: data.owner_password,
+    });
+
+    if (!result.success) {
+      setFormError(result.error ?? result.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (result.email_confirmation_required) {
+      // Edge case: email confirmation is enabled in Supabase project settings.
+      setSuccessMessage(
+        "Your laboratory account was created! Please check your email to verify your address, then sign in."
+      );
+      setIsSubmitting(false);
+      return;
+    }
+
+    // ── Step 2: Sign in with the newly-created credentials ─────────────────
+    // The backend used admin.create_user with email_confirm=true, so login
+    // should succeed immediately without requiring an email link.
+    const { error: signInError } = await signInWithEmail(
       data.owner_email,
       data.owner_password
     );
 
-    if (authError) {
-      setFormError(getRegistrationError(authError.message));
-      setIsSubmitting(false);
-      return;
-    }
-
-    const userId = authData?.user?.id;
-    if (!userId) {
-      setFormError(
-        "Unable to create the laboratory account. Please try again."
+    if (signInError) {
+      // Account was created but auto-login failed. Redirect to login page.
+      setSuccessMessage(
+        "Your laboratory account was created successfully. Please sign in with your credentials."
       );
       setIsSubmitting(false);
+      setTimeout(() => navigate("/login", { replace: true }), 2500);
       return;
     }
 
-    // Step 2: Create laboratory record
-    const { id: laboratoryId, error: labError } = await createLaboratory({
-      name: data.lab_name,
-      license_number: data.lab_license,
-      address: data.lab_address,
-      city: data.lab_city,
-      state: data.lab_state,
-      country: data.lab_country ?? "India",
-      official_email: data.lab_email,
-      phone: data.lab_phone,
-    });
-
-    if (labError || !laboratoryId) {
-      setFormError(
-        "Your account was created but the laboratory could not be set up. " +
-          "Please contact support."
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Step 3: Create owner profile
-    const { error: profileError } = await createOwnerProfile({
-      id: userId,
-      laboratory_id: laboratoryId,
-      full_name: data.owner_name,
-      email: data.owner_email,
-    });
-
-    if (profileError) {
-      setFormError(
-        "Your account and laboratory were created, but the profile could not be saved. " +
-          "Please sign in and contact support."
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Step 4: Navigate — AuthProvider will detect the session and load the profile.
+    // ── Step 3: AuthProvider will detect SIGNED_IN event, load profile,
+    //            then the useEffect above redirects to owner dashboard.
+    // Explicitly navigate now in case the event fires before this component unmounts.
     navigate("/app/owner/dashboard", { replace: true });
   };
 
@@ -257,6 +231,19 @@ export default function RegisterPage() {
             holder becomes the laboratory owner.
           </p>
         </div>
+
+        {/* Success banner */}
+        {successMessage && (
+          <div
+            className="mb-6 rounded-md border border-green-500/30 bg-green-500/5 px-4 py-3"
+            role="status"
+            aria-live="polite"
+          >
+            <p className="text-sm text-green-700 dark:text-green-400">
+              {successMessage}
+            </p>
+          </div>
+        )}
 
         {/* Form */}
         <form

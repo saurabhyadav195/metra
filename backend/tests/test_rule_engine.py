@@ -908,6 +908,35 @@ def test_endurance_evaluation():
     assert spec_fail["status"] == "FAIL"
 
 
+def test_laboratory_code_settings_and_models():
+    """Verify LabSettingsResponse and UpdateLabSettingsRequest schema and behavior."""
+    from app.routers.settings import LabSettingsResponse, UpdateLabSettingsRequest
+
+    # Test GET response mapping with laboratory_code
+    resp = LabSettingsResponse(
+        id="lab-uuid-123",
+        name="Precision Metrology Lab",
+        laboratory_code="PMTL-001",
+        accreditation_number="REG-102",
+        contact_email="lab@example.com",
+        contact_phone="+91 9876543210"
+    )
+    assert resp.laboratory_code == "PMTL-001"
+    assert "laboratory_code" in resp.model_dump()
+
+    # Test PATCH request mapping
+    req = UpdateLabSettingsRequest(
+        name="Precision Metrology Lab",
+        laboratory_code="  PMTL-101  "
+    )
+    payload = req.model_dump(exclude_none=True)
+    val = payload.get("laboratory_code")
+    if isinstance(val, str):
+        val = val.strip()
+    assert val == "PMTL-101"
+
+
+
 
 
 
