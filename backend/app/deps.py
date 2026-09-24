@@ -98,7 +98,7 @@ async def get_authenticated_user(
     if not profile.get("is_active", False):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Your account has been deactivated.",
+            detail="Your account has been deactivated. Please contact your laboratory administrator.",
         )
 
     return AuthenticatedUser(

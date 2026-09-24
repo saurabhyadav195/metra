@@ -37,23 +37,52 @@ const ROLE_DASHBOARD: Record<UserRole, string> = {
 /* ── Supabase error → friendly message ───────────── */
 
 function getAuthErrorMessage(errorMessage: string): string {
+  if (!errorMessage) return "Sign-in failed. Please try again.";
   const lower = errorMessage.toLowerCase();
-  if (lower.includes("invalid login credentials") || lower.includes("invalid email or password")) {
+
+  // 1. Deactivated account
+  if (
+    lower.includes("deactivated") ||
+    lower.includes("disabled") ||
+    lower.includes("inactive")
+  ) {
+    return "Your account has been deactivated. Please contact your laboratory administrator.";
+  }
+
+  // 2. Invalid credentials
+  if (
+    lower.includes("invalid login credentials") ||
+    lower.includes("invalid email or password") ||
+    lower.includes("invalid credentials") ||
+    lower.includes("user not found") ||
+    lower.includes("wrong password")
+  ) {
     return "Invalid email or password.";
   }
+
+  // 3. Email not confirmed
   if (lower.includes("email not confirmed")) {
     return "Please verify your email address before signing in.";
   }
-  if (lower.includes("too many requests")) {
+
+  // 4. Rate limiting / Too many attempts
+  if (lower.includes("too many requests") || lower.includes("rate limit")) {
     return "Too many sign-in attempts. Please wait a moment and try again.";
   }
+
+  // 5. Network / server connection failure
   if (
-    lower.includes("fetch") ||
-    lower.includes("network") ||
-    lower.includes("failed")
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("network error") ||
+    lower.includes("connection refused") ||
+    lower.includes("unable to reach") ||
+    lower.includes("net::err")
   ) {
     return "Unable to reach the server. Check your connection and try again.";
   }
+
+  // 6. Generic / unexpected fallback
   return "Sign-in failed. Please try again.";
 }
 
@@ -76,9 +105,19 @@ export default function LoginPage() {
     defaultValues: { email: "", password: "" },
   });
 
+  /* Check for deactivation message on mount */
+  useEffect(() => {
+    const savedError = sessionStorage.getItem("metra_deactivation_error");
+    if (savedError) {
+      setAuthError(savedError);
+      sessionStorage.removeItem("metra_deactivation_error");
+    }
+  }, []);
+
   /* Redirect if already authenticated */
   useEffect(() => {
     if (isAuthenticated && profile) {
+      setAuthError(null);
       navigate(ROLE_DASHBOARD[profile.role], { replace: true });
     }
   }, [isAuthenticated, profile, navigate]);
@@ -91,28 +130,47 @@ export default function LoginPage() {
   /* ── Demo button handler ───────────────────────── */
 
   const handleDemoSelect = (role: DemoRole) => {
+    setAuthError(null);
     const account = DEMO_ACCOUNTS[role];
     setValue("email", account.email, { shouldValidate: true });
     setValue("password", account.password, { shouldValidate: true });
     setSelectedDemo(role);
-    setAuthError(null);
   };
 
   /* ── Form submit ───────────────────────────────── */
 
   const onSubmit = async (data: LoginFormValues) => {
-    setIsSubmitting(true);
     setAuthError(null);
+    setIsSubmitting(true);
 
-    const { error } = await signInWithEmail(data.email, data.password);
+    try {
+      const { error } = await signInWithEmail(data.email, data.password);
 
-    if (error) {
-      setAuthError(getAuthErrorMessage(error.message));
+      if (error) {
+        const savedDeactErr = sessionStorage.getItem("metra_deactivation_error");
+        if (savedDeactErr) {
+          sessionStorage.removeItem("metra_deactivation_error");
+          setAuthError(savedDeactErr);
+        } else {
+          setAuthError(getAuthErrorMessage(error.message));
+        }
+        setIsSubmitting(false);
+        return;
+      }
+    } catch (err: any) {
+      const savedDeactErr = sessionStorage.getItem("metra_deactivation_error");
+      if (savedDeactErr) {
+        sessionStorage.removeItem("metra_deactivation_error");
+        setAuthError(savedDeactErr);
+      } else {
+        setAuthError(getAuthErrorMessage(err?.message || ""));
+      }
       setIsSubmitting(false);
       return;
     }
 
-    // Auth state change listener in AuthProvider handles profile load + redirect.
+    setAuthError(null);
+    setIsSubmitting(false);
   };
 
   /* ── Render ────────────────────────────────────── */
@@ -250,8 +308,8 @@ export default function LoginPage() {
                   )}
                 </div>
 
-                {/* Auth error */}
-                {authError && (
+                {/* Auth error — rendered ONLY when not submitting */}
+                {!isSubmitting && authError && (
                   <div
                     className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2"
                     role="alert"
@@ -322,4 +380,3 @@ export default function LoginPage() {
     </div>
   );
 }
-

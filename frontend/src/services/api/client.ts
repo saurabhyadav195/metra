@@ -55,6 +55,12 @@ async function handleResponse<T>(response: Response): Promise<T> {
         ? (body as { detail: string }).detail
         : `Request failed (${response.status}).`;
 
+    if (response.status === 403 && detail.toLowerCase().includes("deactivated")) {
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("metra:deactivated", { detail }));
+      }
+    }
+
     throw new ApiError(response.status, detail);
   }
 

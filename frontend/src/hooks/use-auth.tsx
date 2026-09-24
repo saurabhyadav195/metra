@@ -14,6 +14,9 @@ import {
   signOut as supabaseSignOut,
 } from "@/services/supabase/auth";
 
+const DEACTIVATED_MESSAGE =
+  "Your account has been deactivated. Please contact your laboratory administrator.";
+
 interface AuthContextValue extends AuthState {
   signOut: () => Promise<void>;
 }
@@ -27,14 +30,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadProfile = useCallback(async (authUser: User) => {
-    const { profile: fetchedProfile } = await fetchUserProfile(
+    const { profile: fetchedProfile, error } = await fetchUserProfile(
       authUser.id,
       authUser.email ?? ""
     );
+
+    if (error || !fetchedProfile) {
+      await supabaseSignOut();
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      if (!error || error.includes("deactivated") || error.includes("Deactivated")) {
+        sessionStorage.setItem("metra_deactivation_error", DEACTIVATED_MESSAGE);
+      }
+      return;
+    }
+
     setProfile(fetchedProfile);
   }, []);
 
+  const handleDeactivatedEvent = useCallback(async () => {
+    sessionStorage.setItem("metra_deactivation_error", DEACTIVATED_MESSAGE);
+    await supabaseSignOut();
+    setUser(null);
+    setProfile(null);
+    setSession(null);
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+  }, []);
+
   useEffect(() => {
+    const handleDeactivated = () => {
+      handleDeactivatedEvent();
+    };
+
+    window.addEventListener("metra:deactivated", handleDeactivated);
+
     const {
       data: { subscription },
     } = onAuthStateChange(async (event, newSession) => {
@@ -58,9 +90,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     return () => {
+      window.removeEventListener("metra:deactivated", handleDeactivated);
       subscription.unsubscribe();
     };
-  }, [loadProfile]);
+  }, [loadProfile, handleDeactivatedEvent]);
 
   const handleSignOut = useCallback(async () => {
     await supabaseSignOut();
@@ -74,7 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     profile,
     session,
     isLoading,
-    isAuthenticated: !!session && !!user,
+    isAuthenticated: !!session && !!user && profile?.is_active !== false,
     signOut: handleSignOut,
   };
 
