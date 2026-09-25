@@ -25,6 +25,14 @@ import { Stepper, EVALUATION_STEPS } from "@/components/common/Stepper";
 import { SectionCard } from "@/components/common/SectionCard";
 import { ResultBadge, StatusBadge } from "@/components/common/StatusBadge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { getEvaluation, finalizeEvaluation } from "@/services/api/evaluations";
 import { LoadingState } from "@/components/common/EmptyState";
 import type { Evaluation, EvaluationStatus } from "@/types/evaluation";
@@ -41,6 +49,7 @@ export default function EvaluationResultsPage() {
   const [loading, setLoading] = useState(true);
   const [finalizing, setFinalizing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   useEffect(() => {
     document.title = "METRA — Evaluation Results";
@@ -54,6 +63,7 @@ export default function EvaluationResultsPage() {
 
   const handleFinalize = async () => {
     if (!evaluationId) return;
+    setIsConfirmOpen(false);
     setFinalizing(true);
     setErrorMessage(null);
     try {
@@ -234,7 +244,7 @@ export default function EvaluationResultsPage() {
                 Pending Verification
               </Button>
             ) : (
-              <Button size="sm" onClick={handleFinalize} disabled={finalizing} className="gap-1.5">
+              <Button size="sm" onClick={() => setIsConfirmOpen(true)} disabled={finalizing} className="gap-1.5">
                 <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-4" />
                 {finalizing ? "Finalizing..." : "Finalize & Generate Report"}
               </Button>
@@ -242,6 +252,27 @@ export default function EvaluationResultsPage() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Dialog for Finalize & Generate Report */}
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Finalize Evaluation & Generate Report</DialogTitle>
+            <DialogDescription>
+              Finalizing this evaluation calculates overall compliance across all test procedures, locks test records, and generates the official metrological evaluation report for verification. Are you sure you want to finalize now?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFinalize} disabled={finalizing}>
+              {finalizing ? "Finalizing..." : "Confirm & Finalize"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }
+

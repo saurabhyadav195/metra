@@ -1,27 +1,61 @@
 /**
  * METRA — components/common/EmptyState.tsx
- * Professional empty state for data-driven pages.
+ *
+ * Standardized states for data-driven pages.
+ *
+ * Exports:
+ *   EmptyState   – no records / no results / permission / workflow-not-started
+ *   LoadingState – accessible spinner with role="status" / aria-live
+ *   ErrorState   – error with Hugeicons (replaces raw SVG)
+ *
+ * Accessibility: AX-5 fix — LoadingState gets role="status" + aria-live="polite"
+ * Component fix: CP-5 — ErrorState uses Hugeicons instead of raw SVG
  */
 
 import type { ReactNode } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
+import { AlertCircleIcon } from "@hugeicons/core-free-icons";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+// ─── EmptyState ───────────────────────────────────────────────────────────────
+
+/**
+ * variant controls the visual treatment:
+ * - "no-data"    : grey — no records exist yet (first-time state)
+ * - "no-results" : amber-tinted — search/filter returned nothing (user-driven)
+ * - "no-access"  : red-tinted — insufficient permissions
+ * - "not-started": blue-tinted — workflow has not started yet
+ */
+export type EmptyStateVariant = "no-data" | "no-results" | "no-access" | "not-started";
 
 interface EmptyStateProps {
   icon?: React.ComponentProps<typeof HugeiconsIcon>["icon"];
   title: string;
   description?: string;
   action?: ReactNode;
+  /** Controls visual framing of the reason for the empty state */
+  variant?: EmptyStateVariant;
   className?: string;
 }
+
+const VARIANT_ICON_CLASS: Record<EmptyStateVariant, string> = {
+  "no-data":     "bg-muted text-muted-foreground",
+  "no-results":  "bg-warning-bg text-warning-text",
+  "no-access":   "bg-error-bg text-error-text",
+  "not-started": "bg-info-bg text-info-text",
+};
 
 export function EmptyState({
   icon,
   title,
   description,
   action,
+  variant = "no-data",
   className,
 }: EmptyStateProps) {
+  const iconClass = VARIANT_ICON_CLASS[variant];
+
   return (
     <div
       className={cn(
@@ -30,11 +64,12 @@ export function EmptyState({
       )}
     >
       {icon && (
-        <div className="mb-4 rounded-full bg-accent p-4">
+        <div className={cn("mb-4 rounded-full p-4", iconClass)}>
           <HugeiconsIcon
             icon={icon}
             strokeWidth={1.5}
-            className="size-8 text-muted-foreground"
+            className="size-8"
+            aria-hidden="true"
           />
         </div>
       )}
@@ -49,9 +84,9 @@ export function EmptyState({
   );
 }
 
-/**
- * Loading state with skeleton animation
- */
+// ─── LoadingState ─────────────────────────────────────────────────────────────
+// AX-5 fix: role="status" + aria-live="polite"
+
 export function LoadingState({
   message = "Loading…",
   className,
@@ -61,20 +96,26 @@ export function LoadingState({
 }) {
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label={message}
       className={cn(
         "flex flex-col items-center justify-center py-16 gap-3",
         className
       )}
     >
-      <div className="h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin" />
+      <div
+        className="h-5 w-5 rounded-full border-2 border-primary/30 border-t-primary animate-spin"
+        aria-hidden="true"
+      />
       <p className="text-sm text-muted-foreground">{message}</p>
     </div>
   );
 }
 
-/**
- * Error state with retry option
- */
+// ─── ErrorState ───────────────────────────────────────────────────────────────
+// CP-5 fix: Uses HugeiconsIcon instead of raw SVG path
+
 export function ErrorState({
   title = "Something went wrong",
   description,
@@ -94,21 +135,13 @@ export function ErrorState({
       )}
       role="alert"
     >
-      <div className="mb-4 rounded-full bg-[var(--error-bg)] p-4">
-        <svg
-          className="size-8 text-[var(--error-text)]"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
+      <div className="mb-4 rounded-full bg-error-bg p-4">
+        <HugeiconsIcon
+          icon={AlertCircleIcon}
           strokeWidth={1.5}
+          className="size-8 text-error-text"
           aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
-          />
-        </svg>
+        />
       </div>
       <p className="text-sm font-medium text-foreground">{title}</p>
       {description && (
@@ -117,12 +150,14 @@ export function ErrorState({
         </p>
       )}
       {onRetry && (
-        <button
+        <Button
+          variant="outline"
+          size="sm"
           onClick={onRetry}
-          className="mt-4 rounded-md border border-border bg-card px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="mt-4"
         >
           Try again
-        </button>
+        </Button>
       )}
     </div>
   );

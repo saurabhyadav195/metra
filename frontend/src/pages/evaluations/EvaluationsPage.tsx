@@ -2,45 +2,52 @@
  * METRA — pages/evaluations/EvaluationsPage.tsx
  * Route: /app/evaluations
  * Lists all evaluations with real API data and status tab filtering.
+ *
+ * Changes vs original:
+ * - P-2: Migrated from useState+useEffect to React Query (useQuery)
+ * - AX-3: Fixed role="tablist" / role="tab" with aria-controls + role="tabpanel"
+ * - L-4: Uses EmptyState variant="no-results" when filter returns nothing
+ * - L-3: Uses EmptyState variant="no-data" when list is genuinely empty
  */
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { ClipboardCheckIcon } from "@hugeicons/core-free-icons";
+import { useQuery } from "@tanstack/react-query";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { EmptyState, LoadingState } from "@/components/common/EmptyState";
+import { EmptyState, LoadingState, ErrorState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
-import { useAuth } from "@/hooks/use-auth";
 import { listEvaluations } from "@/services/api/evaluations";
-import type { Evaluation, EvaluationStatus } from "@/types/evaluation";
+import type { EvaluationStatus } from "@/types/evaluation";
 
 type FilterTab = "all" | string;
 
-const TABS: { label: string; value: FilterTab }[] = [
-  { label: "All", value: "all" },
-  { label: "In Progress", value: "IN_PROGRESS" },
-  { label: "Pending Verification", value: "PENDING_VERIFICATION" },
-  { label: "Approved", value: "APPROVED" },
+const TABS: { label: string; value: FilterTab; panelId: string }[] = [
+  { label: "All",                  value: "all",                  panelId: "tab-panel-all" },
+  { label: "In Progress",          value: "IN_PROGRESS",          panelId: "tab-panel-in-progress" },
+  { label: "Pending Verification", value: "PENDING_VERIFICATION", panelId: "tab-panel-pending" },
+  { label: "Approved",             value: "APPROVED",             panelId: "tab-panel-approved" },
 ];
 
 export default function EvaluationsPage() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
-  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<FilterTab>("all");
 
-  useEffect(() => {
+  const { data: evaluations = [], isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["evaluations"],
+    queryFn: listEvaluations,
+    staleTime: 30_000,
+    meta: { title: "METRA — Evaluations" },
+  });
+
+  // Set document title when data loads
+  if (typeof document !== "undefined") {
     document.title = "METRA — Evaluations";
-    listEvaluations()
-      .then(setEvaluations)
-      .catch((err) => console.error("Failed to list evaluations:", err))
-      .finally(() => setLoading(false));
-  }, []);
+  }
 
   const filtered = evaluations.filter((ev) => {
     if (activeTab === "all") return true;
@@ -60,6 +67,21 @@ export default function EvaluationsPage() {
     });
   };
 
+  const getTabCount = (tabValue: FilterTab) => {
+    if (tabValue === "all") return evaluations.length;
+    if (tabValue === "IN_PROGRESS") {
+      return evaluations.filter((e) => {
+        const st = String(e.status || "").toUpperCase();
+        return st === "IN_PROGRESS" || st === "DRAFT" || st === "REQUIRES_REWORK";
+      }).length;
+    }
+    return evaluations.filter(
+      (e) => String(e.status || "").toUpperCase() === tabValue
+    ).length;
+  };
+
+  const activePanelId = TABS.find((t) => t.value === activeTab)?.panelId ?? "tab-panel-all";
+
   return (
     <AppLayout>
       <PageHeader
@@ -77,61 +99,71 @@ export default function EvaluationsPage() {
         }
       />
 
-      {/* Status tabs */}
+      {/* Status tabs — AX-3 fix: proper role="tablist" with aria-controls */}
       <div className="mb-4 border-b border-border">
-        <div className="flex gap-1 overflow-x-auto" role="tablist">
-          {TABS.map((tab) => {
-            const count =
-              tab.value === "all"
-                ? evaluations.length
-                : tab.value === "IN_PROGRESS"
-                ? evaluations.filter((e) => {
-                    const st = String(e.status || "").toUpperCase();
-                    return st === "IN_PROGRESS" || st === "DRAFT" || st === "REQUIRES_REWORK";
-                  }).length
-                : evaluations.filter((e) => String(e.status || "").toUpperCase() === tab.value).length;
-
-            return (
-              <button
-                key={tab.value}
-                role="tab"
-                aria-selected={activeTab === tab.value}
-                onClick={() => setActiveTab(tab.value)}
-                className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 pb-2 pt-1 text-xs font-medium transition-colors focus-visible:outline-none ${
+        <div
+          className="flex gap-1 overflow-x-auto"
+          role="tablist"
+          aria-label="Evaluation status filters"
+        >
+          {TABS.map((tab) => (
+            <button
+              key={tab.value}
+              id={`tab-${tab.value}`}
+              role="tab"
+              aria-selected={activeTab === tab.value}
+              aria-controls={tab.panelId}
+              onClick={() => setActiveTab(tab.value)}
+              className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 pb-2 pt-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 ${
+                activeTab === tab.value
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab.label}
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
                   activeTab === tab.value
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-muted-foreground"
                 }`}
               >
-                {tab.label}
-                <span
-                  className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-                    activeTab === tab.value
-                      ? "bg-primary/10 text-primary"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+                {getTabCount(tab.value)}
+              </span>
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* Content */}
-      <div className="rounded-lg border border-border bg-card shadow-sm">
-        {loading ? (
-          <LoadingState message="Loading laboratory evaluations..." />
+      {/* Content panel — AX-3 fix: role="tabpanel" with aria-labelledby */}
+      <div
+        id={activePanelId}
+        role="tabpanel"
+        aria-labelledby={`tab-${activeTab}`}
+        className="rounded-lg border border-border bg-card shadow-sm"
+      >
+        {isLoading ? (
+          <LoadingState message="Loading laboratory evaluations…" />
+        ) : isError ? (
+          <ErrorState
+            title="Failed to load evaluations"
+            description={error instanceof Error ? error.message : "An unexpected error occurred."}
+            onRetry={() => refetch()}
+          />
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={ClipboardCheckIcon}
-            title="No evaluations found"
+            title={
+              activeTab === "all"
+                ? "No evaluations registered yet"
+                : "No evaluations match this filter"
+            }
             description={
               activeTab === "all"
                 ? "Start by selecting an instrument and beginning an evaluation."
-                : `No evaluations with status "${activeTab.replace("_", " ").toLowerCase()}" found.`
+                : `No evaluations with status "${activeTab.replace(/_/g, " ").toLowerCase()}" found. Try selecting a different filter tab.`
             }
+            variant={activeTab === "all" ? "no-data" : "no-results"}
             action={
               activeTab === "all" ? (
                 <Button size="sm" onClick={() => navigate("/app/instruments")}>
@@ -205,7 +237,9 @@ export default function EvaluationsPage() {
                         onClick={() => navigate(`/app/evaluations/${ev.id}`)}
                         className="text-xs"
                       >
-                        {["IN_PROGRESS", "DRAFT", "REQUIRES_REWORK"].includes(String(ev.status || "").toUpperCase())
+                        {["IN_PROGRESS", "DRAFT", "REQUIRES_REWORK"].includes(
+                          String(ev.status || "").toUpperCase()
+                        )
                           ? "Continue"
                           : "View"}
                       </Button>

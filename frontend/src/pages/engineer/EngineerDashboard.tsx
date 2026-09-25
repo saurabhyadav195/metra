@@ -1,47 +1,48 @@
 /**
  * METRA — pages/engineer/EngineerDashboard.tsx
  * Route: /app/dashboard for engineer role
- * Powered by FastAPI + Supabase backend.
+ *
+ * Changes vs original:
+ * - P-1: Migrated from useState+useEffect to React Query
+ * - CP-3/VI scaffolding: Removed meaningless "real-time" / "verified" trend props
+ * - L-3: QuickActions extracted to reusable component
  */
 
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   ClipboardCheckIcon,
   Tick02Icon,
   ScaleIcon,
-  ClockIcon,
   AddSquareIcon,
   FileTextIcon,
   ArrowRight01Icon,
-  AlertCircleIcon,
 } from "@hugeicons/core-free-icons";
+import { useQuery } from "@tanstack/react-query";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/common/PageHeader";
 import { MetricCard, MetricGrid } from "@/components/common/MetricCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { SectionCard } from "@/components/common/SectionCard";
+import { QuickActions } from "@/components/common/QuickActions";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { getDashboardStats, type DashboardStats } from "@/services/api/dashboard";
-import { LoadingState } from "@/components/common/EmptyState";
+import { getDashboardStats } from "@/services/api/dashboard";
+import { LoadingState, ErrorState } from "@/components/common/EmptyState";
 import type { EvaluationStatus } from "@/types/evaluation";
 
 export default function EngineerDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    document.title = "METRA — Engineer Dashboard";
-    getDashboardStats()
-      .then(setStats)
-      .catch((err) => console.error("Failed to load dashboard stats:", err))
-      .finally(() => setLoading(false));
-  }, []);
+  document.title = "METRA — Engineer Dashboard";
+
+  const { data: stats, isLoading, isError, refetch } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: getDashboardStats,
+    staleTime: 60_000,
+  });
 
   return (
     <AppLayout>
@@ -63,25 +64,29 @@ export default function EngineerDashboard() {
           }
         />
 
-        {loading ? (
-          <LoadingState message="Loading dashboard metrics..." />
+        {isLoading ? (
+          <LoadingState message="Loading dashboard metrics…" />
+        ) : isError ? (
+          <ErrorState
+            title="Failed to load dashboard"
+            description="Could not retrieve laboratory statistics. Please try again."
+            onRetry={() => refetch()}
+          />
         ) : (
           <>
-            {/* Metric Cards */}
+            {/* Metric Cards — trend prop removed (was scaffolding: "real-time", "verified") */}
             <MetricGrid columns={4}>
               <MetricCard
                 title="Active Evaluations"
                 value={stats?.active_evaluations ?? 0}
                 description="Draft & In Progress"
                 icon={<HugeiconsIcon icon={ClipboardCheckIcon} strokeWidth={2} className="size-5" />}
-                trend="real-time"
               />
               <MetricCard
                 title="Completed"
                 value={stats?.completed_evaluations ?? 0}
                 description="Finalized evaluations"
                 icon={<HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-5" />}
-                trend="verified"
               />
               <MetricCard
                 title="My Instruments"
@@ -166,36 +171,16 @@ export default function EngineerDashboard() {
                 </SectionCard>
               </div>
 
-              {/* Quick Actions */}
-              <div className="space-y-6">
-                <SectionCard title="Quick Workstation Actions">
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2 h-9 text-xs"
-                      onClick={() => navigate("/app/instruments")}
-                    >
-                      <HugeiconsIcon icon={ScaleIcon} strokeWidth={2} className="size-4 text-primary" />
-                      Browse Instruments
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2 h-9 text-xs"
-                      onClick={() => navigate("/app/evaluations")}
-                    >
-                      <HugeiconsIcon icon={ClipboardCheckIcon} strokeWidth={2} className="size-4 text-success" />
-                      View All Evaluations
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2 h-9 text-xs"
-                      onClick={() => navigate("/app/reports")}
-                    >
-                      <HugeiconsIcon icon={FileTextIcon} strokeWidth={2} className="size-4 text-info" />
-                      Access Reports
-                    </Button>
-                  </div>
-                </SectionCard>
+              {/* Quick Actions — extracted to reusable component */}
+              <div>
+                <QuickActions
+                  title="Quick Workstation Actions"
+                  items={[
+                    { icon: ScaleIcon,          label: "Browse Instruments",    href: "/app/instruments",   iconColor: "text-primary" },
+                    { icon: ClipboardCheckIcon, label: "View All Evaluations",  href: "/app/evaluations",   iconColor: "text-success" },
+                    { icon: FileTextIcon,       label: "Access Reports",        href: "/app/reports",       iconColor: "text-info" },
+                  ]}
+                />
               </div>
             </div>
           </>

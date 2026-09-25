@@ -43,6 +43,14 @@ import {
   completeTest,
 } from "@/services/api/evaluations";
 import { LoadingState, ErrorState } from "@/components/common/EmptyState";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { CalculateTestResponse, EvaluationTestResult } from "@/types/evaluation";
 
 // ─── Dev-only debug logger ────────────────────────────────────────────────────
@@ -140,6 +148,7 @@ export default function TestExecutionPage() {
   const [calculating, setCalculating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
   // Track the currently-active request identity so stale responses are discarded.
   const currentRequestKey = useRef<string | null>(null);
@@ -287,6 +296,7 @@ export default function TestExecutionPage() {
 
   const handleComplete = async () => {
     if (!evaluationId || !testId) return;
+    setIsConfirmOpen(false);
     setSaving(true);
     try {
       await saveObservations(evaluationId, testId, observations);
@@ -642,13 +652,33 @@ export default function TestExecutionPage() {
               {calculating ? "Calculating..." : "Calculate (Engine)"}
             </Button>
 
-            <Button size="sm" onClick={handleComplete} disabled={saving} className="gap-1.5 text-xs">
+            <Button size="sm" onClick={() => setIsConfirmOpen(true)} disabled={saving} className="gap-1.5 text-xs">
               <HugeiconsIcon icon={Tick02Icon} strokeWidth={2} className="size-3.5" />
               {saving ? "Saving..." : "Save & Complete Test"}
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Confirmation Dialog for Save & Complete Test */}
+      <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Complete Test Procedure</DialogTitle>
+            <DialogDescription>
+              You are about to save observations and mark this test procedure as completed. The calculated result will be recorded in the evaluation record and you will return to the test selection list.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleComplete} disabled={saving}>
+              {saving ? "Saving..." : "Confirm & Complete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

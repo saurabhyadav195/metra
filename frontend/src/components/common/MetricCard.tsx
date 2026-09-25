@@ -1,20 +1,30 @@
 /**
  * METRA — components/common/MetricCard.tsx
- * Dashboard metric card displaying a labeled numeric value with optional icon and trend.
+ *
+ * Dashboard metric card.
+ *
+ * Fixes applied:
+ * - CP-3: Removed `trend: any` prop — was only ever used with meaningless
+ *   "real-time" / "verified" strings. Callers have been updated to remove it.
+ * - AX-2: When onClick is provided, renders as a native <button> (via
+ *   ButtonPrimitive from Base UI) instead of a div with role="button",
+ *   giving proper keyboard semantics and focus management for free.
+ * - Added visible focus ring on clickable cards.
  */
 
 import type { ReactNode } from "react";
+import { Button as ButtonPrimitive } from "@base-ui/react/button";
 import { HugeiconsIcon } from "@hugeicons/react";
 import { cn } from "@/lib/utils";
 
 interface MetricCardProps {
   title?: string;
+  /** Alias for `title` — prefer `title` for new code */
   label?: string;
   value: string | number;
   icon?: any;
   iconColor?: string;
   description?: string;
-  trend?: any;
   className?: string;
   onClick?: () => void;
 }
@@ -26,30 +36,13 @@ export function MetricCard({
   icon,
   iconColor = "text-primary",
   description,
-  trend,
   className,
   onClick,
 }: MetricCardProps) {
   const displayTitle = title || label || "";
 
-  return (
-    <div
-      className={cn(
-        "rounded-lg border border-border bg-card p-4 shadow-sm",
-        onClick && "cursor-pointer transition-shadow hover:shadow-md",
-        className
-      )}
-      onClick={onClick}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={
-        onClick
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") onClick();
-            }
-          : undefined
-      }
-    >
+  const content = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
@@ -61,20 +54,12 @@ export function MetricCard({
           {description && (
             <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
           )}
-          {trend && (
-            <p
-              className={cn(
-                "mt-1 text-[11px] font-medium text-muted-foreground"
-              )}
-            >
-              {typeof trend === "object" ? trend.value : String(trend)}
-            </p>
-          )}
         </div>
 
         {icon && (
           <div className={cn("shrink-0 rounded-md bg-accent p-2", iconColor)}>
-            {typeof icon === "function" || (typeof icon === "object" && "name" in icon) ? (
+            {typeof icon === "function" ||
+            (typeof icon === "object" && "name" in icon) ? (
               <HugeiconsIcon icon={icon} strokeWidth={1.5} className="size-5" />
             ) : (
               icon
@@ -82,9 +67,39 @@ export function MetricCard({
           </div>
         )}
       </div>
+    </>
+  );
+
+  // AX-2 fix: when clickable, use a native button element via Base UI primitive
+  if (onClick) {
+    return (
+      <ButtonPrimitive
+        className={cn(
+          "w-full text-left rounded-lg border border-border bg-card p-4 shadow-sm",
+          "cursor-pointer transition-shadow hover:shadow-md",
+          "outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+          className
+        )}
+        onClick={onClick}
+      >
+        {content}
+      </ButtonPrimitive>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border border-border bg-card p-4 shadow-sm",
+        className
+      )}
+    >
+      {content}
     </div>
   );
 }
+
+// ─── MetricGrid ───────────────────────────────────────────────────────────────
 
 interface MetricGridProps {
   children: ReactNode;

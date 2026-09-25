@@ -2,16 +2,24 @@
  * METRA — pages/instruments/instruments-page.tsx
  * Route: /app/instruments
  *
- * Lists all instruments for the authenticated laboratory.
- * Engineers see only their own instruments (enforced by backend).
+ * Changes vs original:
+ * - L-2: Now uses <PageHeader> (was the only page with inline header)
+ * - Loading state uses <LoadingState> (was inline <p> text)
+ * - Error state uses <ErrorState> (was inline div)
+ * - EmptyState uses variant="no-data" / "no-results" to differentiate
+ * - Existing React Query usage retained
  */
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { AddSquareIcon } from "@hugeicons/core-free-icons";
 
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/common/PageHeader";
 import { InstrumentStatusBadge } from "@/components/instruments/instrument-status-badge";
+import { EmptyState, LoadingState, ErrorState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,6 +45,7 @@ import {
   INSTRUMENT_TYPES,
 } from "@/types/instrument";
 import type { InstrumentStatus, InstrumentType } from "@/types/instrument";
+import { ScaleIcon } from "@hugeicons/core-free-icons";
 
 /* ── Page ────────────────────────────────────────────────────────────────── */
 
@@ -50,7 +59,7 @@ export default function InstrumentsPage() {
     document.title = "METRA — Instruments";
   }, []);
 
-  const { data, isLoading, isError, error } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["instruments", search, statusFilter, typeFilter],
     queryFn: () =>
       listInstruments({
@@ -62,26 +71,25 @@ export default function InstrumentsPage() {
   });
 
   const instruments = data?.instruments ?? [];
+  const hasFilters = !!(search || statusFilter || typeFilter);
 
   return (
     <AppLayout>
-      {/* Page header */}
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Instruments</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Manage instruments submitted for type evaluation.
-          </p>
-        </div>
-        <Button
-          id="add-instrument-btn"
-          size="lg"
-          onClick={() => navigate("/app/instruments/new")}
-          className="shrink-0"
-        >
-          + Add Instrument
-        </Button>
-      </div>
+      {/* L-2 fix: Now using PageHeader consistently (was inline div) */}
+      <PageHeader
+        title="Instruments"
+        description="Manage instruments submitted for type evaluation."
+        actions={
+          <Button
+            id="add-instrument-btn"
+            size="sm"
+            onClick={() => navigate("/app/instruments/new")}
+          >
+            <HugeiconsIcon icon={AddSquareIcon} strokeWidth={2} className="size-3.5" />
+            Add Instrument
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <div className="mb-4 flex flex-col gap-2 sm:flex-row">
@@ -95,7 +103,10 @@ export default function InstrumentsPage() {
           aria-label="Search instruments"
         />
 
-        <Select value={statusFilter || "all"} onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}>
+        <Select
+          value={statusFilter || "all"}
+          onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}
+        >
           <SelectTrigger id="status-filter" className="h-9 w-40 text-sm bg-card">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
@@ -111,7 +122,10 @@ export default function InstrumentsPage() {
           </SelectContent>
         </Select>
 
-        <Select value={typeFilter || "all"} onValueChange={(val) => setTypeFilter(val === "all" ? "" : val)}>
+        <Select
+          value={typeFilter || "all"}
+          onValueChange={(val) => setTypeFilter(val === "all" ? "" : val)}
+        >
           <SelectTrigger id="type-filter" className="h-9 w-44 text-sm bg-card">
             <SelectValue placeholder="All types" />
           </SelectTrigger>
@@ -129,44 +143,38 @@ export default function InstrumentsPage() {
       {/* Content */}
       <div className="rounded-lg border border-border bg-card">
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <p className="text-sm text-muted-foreground">
-              Loading instruments…
-            </p>
-          </div>
+          <LoadingState message="Loading instruments…" />
         ) : isError ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="text-center">
-              <p className="text-sm font-medium text-foreground">
-                Failed to load instruments
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {error instanceof Error ? error.message : "An error occurred."}
-              </p>
-            </div>
-          </div>
+          <ErrorState
+            title="Failed to load instruments"
+            description={error instanceof Error ? error.message : "An error occurred."}
+            onRetry={() => refetch()}
+          />
         ) : instruments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <p className="text-sm font-medium text-foreground">
-              {search || statusFilter || typeFilter
-                ? "No instruments match your filters."
-                : "No instruments registered yet."}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {search || statusFilter || typeFilter
-                ? "Try clearing the search or filters."
-                : "Register the first instrument to begin the evaluation workflow."}
-            </p>
-            {!(search || statusFilter || typeFilter) && (
-              <Button
-                size="sm"
-                className="mt-4"
-                onClick={() => navigate("/app/instruments/new")}
-              >
-                + Add Instrument
-              </Button>
-            )}
-          </div>
+          <EmptyState
+            icon={ScaleIcon}
+            variant={hasFilters ? "no-results" : "no-data"}
+            title={
+              hasFilters
+                ? "No instruments match your filters"
+                : "No instruments registered yet"
+            }
+            description={
+              hasFilters
+                ? "Try clearing the search or adjusting the filters."
+                : "Register the first instrument to begin the evaluation workflow."
+            }
+            action={
+              !hasFilters ? (
+                <Button
+                  size="sm"
+                  onClick={() => navigate("/app/instruments/new")}
+                >
+                  Add Instrument
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <Table>
             <TableHeader>
@@ -202,9 +210,7 @@ export default function InstrumentsPage() {
                     {instrument.serial_number}
                   </TableCell>
                   <TableCell>
-                    <InstrumentStatusBadge
-                      status={instrument.status}
-                    />
+                    <InstrumentStatusBadge status={instrument.status} />
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {instrument.submission_date

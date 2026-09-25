@@ -2,10 +2,16 @@
  * METRA — pages/reports/ReportsPage.tsx
  * Route: /app/reports
  * Lists all generated test reports & finalized evaluation certificates.
- * Backed by FastAPI backend with laboratory isolation.
+ *
+ * Changes vs original:
+ * - P-2: Migrated from useState+useEffect to React Query
+ * - AX-6: Replaced raw div.fixed.inset-0 rejection modal with <Dialog> component
+ *   (provides role="dialog", aria-modal, focus trapping, keyboard escape, title
+ *   association, and focus restoration automatically via Base UI)
+ * - L-7: Consistent modal pattern now matches rest of the app
  */
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -15,12 +21,21 @@ import {
   Cancel01Icon,
 } from "@hugeicons/core-free-icons";
 import { toast } from "sonner";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/common/PageHeader";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { EmptyState, LoadingState } from "@/components/common/EmptyState";
+import { EmptyState, LoadingState, ErrorState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from "@/hooks/use-auth";
 import {
   listReports,
@@ -32,28 +47,29 @@ import {
 export default function ReportsPage() {
   const navigate = useNavigate();
   const { profile } = useAuth();
-  const [reports, setReports] = useState<ReportListItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  // Rejection modal state
+  // Rejection dialog state
   const [rejectTarget, setRejectTarget] = useState<ReportListItem | null>(null);
   const [rejectReason, setRejectReason] = useState("");
 
-  const loadData = () => {
-    listReports()
-      .then(setReports)
-      .catch((err) => {
-        console.error("Failed to load reports:", err);
-        toast.error("Failed to load reports");
-      })
-      .finally(() => setLoading(false));
-  };
-
+  // Set page title
   useEffect(() => {
     document.title = "METRA — Test Reports";
-    loadData();
   }, []);
+
+  const {
+    data: reports = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useQuery({
+    queryKey: ["reports"],
+    queryFn: listReports,
+    staleTime: 30_000,
+  });
 
   const formatDate = (dateStr: string) => {
     if (!dateStr) return "—";
@@ -71,7 +87,7 @@ export default function ReportsPage() {
       setActionLoading(rpt.evaluation_id);
       await approveReport(rpt.evaluation_id);
       toast.success(`Evaluation ${rpt.id} approved successfully`);
-      loadData();
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to approve evaluation");
     } finally {
@@ -87,7 +103,7 @@ export default function ReportsPage() {
       toast.success(`Evaluation ${rejectTarget.id} rejected for rework`);
       setRejectTarget(null);
       setRejectReason("");
-      loadData();
+      queryClient.invalidateQueries({ queryKey: ["reports"] });
     } catch (err: any) {
       toast.error(err.message || "Failed to reject evaluation");
     } finally {
@@ -103,11 +119,18 @@ export default function ReportsPage() {
       />
 
       <div className="rounded-lg border border-border bg-card shadow-sm">
-        {loading ? (
-          <LoadingState message="Loading laboratory reports..." />
+        {isLoading ? (
+          <LoadingState message="Loading laboratory reports…" />
+        ) : isError ? (
+          <ErrorState
+            title="Failed to load reports"
+            description={error instanceof Error ? error.message : "An unexpected error occurred."}
+            onRetry={() => refetch()}
+          />
         ) : reports.length === 0 ? (
           <EmptyState
             icon={FileTextIcon}
+            variant="not-started"
             title="No reports available"
             description="Reports are automatically generated when evaluations are completed and submitted for verification."
             action={
@@ -146,12 +169,17 @@ export default function ReportsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {reports.map((rpt) => {
-                  const statusUpper = String(rpt.evaluation_status || rpt.status || "").toUpperCase();
+                  const statusUpper = String(
+                    rpt.evaluation_status || rpt.status || ""
+                  ).toUpperCase();
                   const isPending = statusUpper === "PENDING_VERIFICATION";
                   const isBusy = actionLoading === rpt.evaluation_id;
 
                   return (
-                    <tr key={rpt.id} className="hover:bg-accent/50 transition-colors">
+                    <tr
+                      key={rpt.id}
+                      className="hover:bg-accent/50 transition-colors"
+                    >
                       <td className="w-[12%] px-4 py-3 font-mono text-xs font-medium text-foreground whitespace-nowrap">
                         {rpt.id}
                       </td>
@@ -179,11 +207,17 @@ export default function ReportsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => navigate(`/app/reports/${rpt.evaluation_id}`)}
+                            onClick={() =>
+                              navigate(`/app/reports/${rpt.evaluation_id}`)
+                            }
                             className="text-xs gap-1"
                           >
-                            <HugeiconsIcon icon={ViewIcon} strokeWidth={2} className="size-3.5" />
-                            Preview Report
+                            <HugeiconsIcon
+                              icon={ViewIcon}
+                              strokeWidth={2}
+                              className="size-3.5"
+                            />
+                            Preview
                           </Button>
 
                           {isOwnerOrAdmin && isPending && (
@@ -193,9 +227,13 @@ export default function ReportsPage() {
                                 size="sm"
                                 disabled={isBusy}
                                 onClick={() => handleApprove(rpt)}
-                                className="text-xs gap-1 border-emerald-500/30 text-emerald-700 hover:bg-emerald-500/10 dark:text-emerald-400"
+                                className="text-xs gap-1 border-success-border text-success-text hover:bg-success-bg"
                               >
-                                <HugeiconsIcon icon={CheckmarkCircle02Icon} strokeWidth={2} className="size-3.5" />
+                                <HugeiconsIcon
+                                  icon={CheckmarkCircle02Icon}
+                                  strokeWidth={2}
+                                  className="size-3.5"
+                                />
                                 Approve
                               </Button>
                               <Button
@@ -206,9 +244,13 @@ export default function ReportsPage() {
                                   setRejectTarget(rpt);
                                   setRejectReason("");
                                 }}
-                                className="text-xs gap-1 border-rose-500/30 text-rose-700 hover:bg-rose-500/10 dark:text-rose-400"
+                                className="text-xs gap-1 border-error-border text-error-text hover:bg-error-bg"
                               >
-                                <HugeiconsIcon icon={Cancel01Icon} strokeWidth={2} className="size-3.5" />
+                                <HugeiconsIcon
+                                  icon={Cancel01Icon}
+                                  strokeWidth={2}
+                                  className="size-3.5"
+                                />
                                 Reject
                               </Button>
                             </>
@@ -224,44 +266,61 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* Rejection Modal */}
-      {rejectTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
-            <h3 className="text-base font-semibold text-foreground mb-1">Reject Evaluation for Rework</h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Please provide a clear reason for rejecting report <strong>{rejectTarget.id}</strong> back to the testing engineer.
-            </p>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Enter rejection reason / required corrections..."
-              className="w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary mb-4"
-              rows={4}
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setRejectTarget(null);
-                  setRejectReason("");
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                disabled={!rejectReason.trim() || !!actionLoading}
-                onClick={handleConfirmReject}
-              >
-                {actionLoading ? "Rejecting..." : "Confirm Rejection"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* AX-6 fix: Proper Dialog component (role="dialog", aria-modal, focus trap,
+          keyboard escape, focus restoration — all handled by Base UI Dialog) */}
+      <Dialog
+        open={!!rejectTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRejectTarget(null);
+            setRejectReason("");
+          }
+        }}
+      >
+        <DialogContent showCloseButton={!actionLoading}>
+          <DialogHeader>
+            <DialogTitle>Reject Evaluation for Rework</DialogTitle>
+            <DialogDescription>
+              Please provide a clear reason for returning report{" "}
+              <strong className="text-foreground font-semibold">
+                {rejectTarget?.id}
+              </strong>{" "}
+              to the testing engineer. This reason will be visible to the engineer.
+            </DialogDescription>
+          </DialogHeader>
+
+          <textarea
+            value={rejectReason}
+            onChange={(e) => setRejectReason(e.target.value)}
+            placeholder="Enter rejection reason / required corrections…"
+            className="w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            rows={4}
+            aria-label="Rejection reason"
+          />
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!!actionLoading}
+              onClick={() => {
+                setRejectTarget(null);
+                setRejectReason("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={!rejectReason.trim() || !!actionLoading}
+              onClick={handleConfirmReject}
+            >
+              {actionLoading ? "Rejecting…" : "Confirm Rejection"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

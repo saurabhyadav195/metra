@@ -527,7 +527,7 @@ export default function RegisterPage() {
               type="submit"
               id="register-submit"
               disabled={isSubmitting}
-              className="h-9 w-full sm:w-auto sm:min-w-[220px] text-sm"
+              className="h-9 w-full sm:w-auto sm:min-w-55 text-sm"
             >
               {isSubmitting
                 ? "Creating laboratory…"

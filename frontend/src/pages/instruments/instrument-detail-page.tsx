@@ -2,15 +2,22 @@
  * METRA — pages/instruments/instrument-detail-page.tsx
  * Route: /app/instruments/:id
  *
- * Detailed view of a single instrument with Edit, Start Evaluation, and Delete actions.
+ * Changes vs original:
+ * - CP-6: Removed duplicate local DetailRow — now uses exported DetailRow from SectionCard.tsx
+ * - CP-10: Back nav uses consistent PageHeader breadcrumb pattern via PageHeader component
+ * - AX-9: Loading state now uses LoadingState component with aria-live
+ * - Loading/error states use standardized EmptyState components
  */
 
 import { useEffect, useState } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { AppLayout } from "@/components/layout/AppLayout";
+import { PageHeader } from "@/components/common/PageHeader";
 import { InstrumentStatusBadge } from "@/components/instruments/instrument-status-badge";
+import { SectionCard, DetailRow } from "@/components/common/SectionCard";
+import { LoadingState, ErrorState } from "@/components/common/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -26,51 +33,6 @@ import { useAuth } from "@/hooks/use-auth";
 import { getInstrument, deleteInstrument } from "@/services/api/instruments";
 import { INSTRUMENT_TYPE_LABELS } from "@/types/instrument";
 import type { InstrumentType } from "@/types/instrument";
-
-function DetailRow({
-  label,
-  value,
-  mono,
-}: {
-  label: string;
-  value?: string | number | null;
-  mono?: boolean;
-}) {
-  return (
-    <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd
-        className={`mt-1 text-xs text-foreground sm:col-span-2 sm:mt-0 ${
-          mono ? "font-mono" : ""
-        }`}
-      >
-        {value !== undefined && value !== null && value !== "" ? (
-          value
-        ) : (
-          <span className="text-muted-foreground font-normal">—</span>
-        )}
-      </dd>
-    </div>
-  );
-}
-
-function DetailSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border border-border bg-card p-5 shadow-sm">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {title}
-      </h3>
-      <Separator className="my-3" />
-      <dl className="divide-y divide-border/50">{children}</dl>
-    </div>
-  );
-}
 
 export default function InstrumentDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -119,9 +81,8 @@ export default function InstrumentDetailPage() {
   if (isLoading) {
     return (
       <AppLayout>
-        <div className="flex items-center justify-center py-20">
-          <p className="text-sm text-muted-foreground">Loading instrument details…</p>
-        </div>
+        {/* AX-9 fix: uses LoadingState with aria-live instead of raw <p> */}
+        <LoadingState message="Loading instrument details…" />
       </AppLayout>
     );
   }
@@ -129,20 +90,16 @@ export default function InstrumentDetailPage() {
   if (isError || !instrument) {
     return (
       <AppLayout>
-        <div className="mx-auto max-w-xl py-12 text-center">
-          <h2 className="text-lg font-semibold text-foreground">
-            Instrument Not Found
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {error instanceof Error ? error.message : "The requested instrument could not be loaded."}
-          </p>
-          <Button
-            className="mt-6"
-            variant="outline"
-            onClick={() => navigate("/app/instruments")}
-          >
-            Back to Instruments
-          </Button>
+        <div className="mx-auto max-w-xl">
+          <ErrorState
+            title="Instrument Not Found"
+            description={
+              error instanceof Error
+                ? error.message
+                : "The requested instrument could not be loaded."
+            }
+            onRetry={() => navigate("/app/instruments")}
+          />
         </div>
       </AppLayout>
     );
@@ -151,214 +108,171 @@ export default function InstrumentDetailPage() {
   return (
     <AppLayout>
       <div className="mx-auto max-w-4xl space-y-6">
-        {/* Breadcrumb & Top Actions */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <Link
-            to="/app/instruments"
-            className="text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            &larr; Back to Instruments
-          </Link>
-
-          <div className="flex items-center gap-2">
-            {canDelete && (
+        {/* CP-10 fix: consistent PageHeader + breadcrumbs instead of inline back link */}
+        <PageHeader
+          title={instrument.model || "Unnamed Model"}
+          badge={<InstrumentStatusBadge status={instrument.status} />}
+          description={`${instrument.manufacturer} · Serial: ${instrument.serial_number}`}
+          breadcrumbs={[
+            { label: "Instruments", href: "/app/instruments" },
+            { label: instrument.model || "Instrument" },
+          ]}
+          actions={
+            <div className="flex items-center gap-2">
+              {canDelete && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  Delete
+                </Button>
+              )}
               <Button
-                variant="destructive"
+                variant="outline"
                 size="sm"
-                onClick={() => setIsDeleteDialogOpen(true)}
+                onClick={() => navigate(`/app/instruments/${id}/edit`)}
               >
-                Delete
+                Edit
               </Button>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate(`/app/instruments/${id}/edit`)}
-            >
-              Edit
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => navigate(`/app/instruments/${id}/evaluation/new`)}
-            >
-              Start Evaluation
-            </Button>
-          </div>
-        </div>
-
-        {/* Instrument Overview Banner */}
-        <div className="rounded-lg border border-border bg-card p-6 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-foreground">
-                  {instrument.model || "Unnamed Model"}
-                </h1>
-                <InstrumentStatusBadge status={instrument.status} />
-              </div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {instrument.manufacturer} &middot; Serial:{" "}
-                <span className="font-mono text-foreground">
-                  {instrument.serial_number}
-                </span>
-              </p>
+              <Button
+                size="sm"
+                onClick={() => navigate(`/app/instruments/${id}/evaluation/new`)}
+              >
+                Start Evaluation
+              </Button>
             </div>
-            <div className="text-left sm:text-right">
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                Type
-              </span>
-              <p className="text-xs font-semibold text-foreground">
-                {INSTRUMENT_TYPE_LABELS[
-                  instrument.instrument_type as InstrumentType
-                ] ?? instrument.instrument_type}
-              </p>
-            </div>
-          </div>
-        </div>
+          }
+        />
 
-        {/* Detail Grid */}
+        {/* Detail Grid — CP-6 fix: uses shared DetailRow from SectionCard.tsx */}
         <div className="grid gap-6 md:grid-cols-2">
           {/* Section 1: Instrument Information */}
-          <DetailSection title="Instrument Information">
-            <DetailRow label="Manufacturer" value={instrument.manufacturer} />
-            <DetailRow
-              label="Manufacturer Address"
-              value={instrument.manufacturer_address}
-            />
-            <DetailRow label="Model Designation" value={instrument.model} />
-            <DetailRow
-              label="Serial Number"
-              value={instrument.serial_number}
-              mono
-            />
-            <DetailRow
-              label="Instrument Type"
-              value={
-                INSTRUMENT_TYPE_LABELS[
-                  instrument.instrument_type as InstrumentType
-                ] ?? instrument.instrument_type
-              }
-            />
-            <DetailRow label="Accuracy Class" value={instrument.accuracy_class} />
-          </DetailSection>
+          <SectionCard title="Instrument Information">
+            <dl className="divide-y divide-border/50">
+              <DetailRow label="Manufacturer" value={instrument.manufacturer} />
+              <DetailRow label="Manufacturer Address" value={instrument.manufacturer_address} />
+              <DetailRow label="Model Designation" value={instrument.model} />
+              <DetailRow label="Serial Number" value={instrument.serial_number} mono />
+              <DetailRow
+                label="Instrument Type"
+                value={
+                  INSTRUMENT_TYPE_LABELS[instrument.instrument_type as InstrumentType] ??
+                  instrument.instrument_type
+                }
+              />
+              <DetailRow label="Accuracy Class" value={instrument.accuracy_class} />
+            </dl>
+          </SectionCard>
 
           {/* Section 2: Metrological Parameters */}
-          <DetailSection title="Metrological Parameters">
-            <DetailRow
-              label="Maximum Capacity (Max)"
-              value={
-                instrument.max_capacity !== null
-                  ? `${instrument.max_capacity} kg`
-                  : null
-              }
-            />
-            <DetailRow
-              label="Minimum Capacity (Min)"
-              value={
-                instrument.min_capacity !== null
-                  ? `${instrument.min_capacity} kg`
-                  : null
-              }
-            />
-            {Array.isArray(instrument.weighing_intervals) &&
-            instrument.weighing_intervals.length > 0 ? (
-              <div className="py-2.5">
-                <dt className="text-xs font-medium text-muted-foreground mb-2">
-                  Weighing Intervals (Multi-interval OIML T.3.2.6)
-                </dt>
-                <dd className="sm:col-span-2">
-                  <div className="overflow-x-auto rounded border border-border">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-muted/50 font-medium text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-1.5 border-b border-border">Interval #</th>
-                          <th className="px-3 py-1.5 border-b border-border">Partial Range</th>
-                          <th className="px-3 py-1.5 border-b border-border">Max Load</th>
-                          <th className="px-3 py-1.5 border-b border-border">e (Verification Scale Interval)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/50 font-mono text-[11px]">
-                        {instrument.weighing_intervals.map((iv, idx, arr) => {
-                          const minBound =
-                            idx === 0
-                              ? instrument.min_capacity || 0
-                              : arr[idx - 1].max_load;
-                          return (
-                            <tr key={idx}>
-                              <td className="px-3 py-1.5 text-foreground font-semibold">
-                                W{idx + 1}
-                              </td>
-                              <td className="px-3 py-1.5">
-                                {minBound} – {iv.max_load} kg
-                              </td>
-                              <td className="px-3 py-1.5">{iv.max_load} kg</td>
-                              <td className="px-3 py-1.5 font-bold text-primary">
-                                {iv.e} kg
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </dd>
-              </div>
-            ) : (
+          <SectionCard title="Metrological Parameters">
+            <dl className="divide-y divide-border/50">
               <DetailRow
-                label="Verification Scale Interval (e)"
+                label="Maximum Capacity (Max)"
+                value={instrument.max_capacity !== null ? `${instrument.max_capacity} kg` : null}
+              />
+              <DetailRow
+                label="Minimum Capacity (Min)"
+                value={instrument.min_capacity !== null ? `${instrument.min_capacity} kg` : null}
+              />
+              {Array.isArray(instrument.weighing_intervals) &&
+              instrument.weighing_intervals.length > 0 ? (
+                <div className="py-2.5">
+                  <dt className="text-xs font-medium text-muted-foreground mb-2">
+                    Weighing Intervals (Multi-interval OIML T.3.2.6)
+                  </dt>
+                  <dd className="sm:col-span-2">
+                    <div className="overflow-x-auto rounded border border-border">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-muted/50 font-medium text-muted-foreground">
+                          <tr>
+                            <th className="px-3 py-1.5 border-b border-border">Interval #</th>
+                            <th className="px-3 py-1.5 border-b border-border">Partial Range</th>
+                            <th className="px-3 py-1.5 border-b border-border">Max Load</th>
+                            <th className="px-3 py-1.5 border-b border-border">e (VSI)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50 font-mono text-[11px]">
+                          {instrument.weighing_intervals.map((iv, idx, arr) => {
+                            const minBound =
+                              idx === 0
+                                ? instrument.min_capacity || 0
+                                : arr[idx - 1].max_load;
+                            return (
+                              <tr key={idx}>
+                                <td className="px-3 py-1.5 text-foreground font-semibold">
+                                  W{idx + 1}
+                                </td>
+                                <td className="px-3 py-1.5">
+                                  {minBound} – {iv.max_load} kg
+                                </td>
+                                <td className="px-3 py-1.5">{iv.max_load} kg</td>
+                                <td className="px-3 py-1.5 font-bold text-primary">
+                                  {iv.e} kg
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </dd>
+                </div>
+              ) : (
+                <DetailRow
+                  label="Verification Scale Interval (e)"
+                  value={
+                    instrument.verification_scale_interval !== null
+                      ? `${instrument.verification_scale_interval} kg`
+                      : null
+                  }
+                />
+              )}
+              <DetailRow
+                label="Actual Scale Interval (d)"
                 value={
-                  instrument.verification_scale_interval !== null
-                    ? `${instrument.verification_scale_interval} kg`
+                  instrument.actual_scale_interval !== null
+                    ? `${instrument.actual_scale_interval} kg`
                     : null
                 }
               />
-            )}
-            <DetailRow
-              label="Actual Scale Interval (d)"
-              value={
-                instrument.actual_scale_interval !== null
-                  ? `${instrument.actual_scale_interval} kg`
-                  : null
-              }
-            />
-            <DetailRow
-              label="Verification Intervals (n)"
-              value={instrument.verification_intervals}
-            />
-          </DetailSection>
+              <DetailRow
+                label="Verification Intervals (n)"
+                value={instrument.verification_intervals}
+              />
+            </dl>
+          </SectionCard>
 
           {/* Section 3: Technical Information */}
-          <DetailSection title="Technical Information">
-            <DetailRow
-              label="Load Receptor Type"
-              value={instrument.load_receptor_type}
-            />
-            <DetailRow
-              label="Indicating Device Type"
-              value={instrument.indicating_device_type}
-            />
-            <DetailRow
-              label="Software / Firmware"
-              value={instrument.software_version}
-            />
-            <DetailRow label="Intended Use" value={instrument.intended_use} />
-          </DetailSection>
+          <SectionCard title="Technical Information">
+            <dl className="divide-y divide-border/50">
+              <DetailRow label="Load Receptor Type" value={instrument.load_receptor_type} />
+              <DetailRow label="Indicating Device Type" value={instrument.indicating_device_type} />
+              <DetailRow label="Software / Firmware" value={instrument.software_version} />
+              <DetailRow label="Intended Use" value={instrument.intended_use} />
+            </dl>
+          </SectionCard>
 
-          {/* Section 4: Submission & Documents */}
-          <DetailSection title="Submission Information">
-            <DetailRow
-              label="Submission Date"
-              value={
-                instrument.submission_date
-                  ? new Date(instrument.submission_date).toLocaleDateString(
-                      "en-IN",
-                      { day: "2-digit", month: "short", year: "numeric" }
-                    )
-                  : null
-              }
-            />
-            <DetailRow label="Remarks" value={instrument.remarks} />
+          {/* Section 4: Submission Information */}
+          <SectionCard title="Submission Information">
+            <dl className="divide-y divide-border/50">
+              <DetailRow
+                label="Submission Date"
+                value={
+                  instrument.submission_date
+                    ? new Date(instrument.submission_date).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : null
+                }
+              />
+              <DetailRow label="Remarks" value={instrument.remarks} />
+            </dl>
             <div className="pt-3">
+              <Separator className="mb-3" />
               <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
                 Supporting Documents
               </p>
@@ -366,7 +280,7 @@ export default function InstrumentDetailPage() {
                 Document and photograph attachments will be managed during evaluation.
               </div>
             </div>
-          </DetailSection>
+          </SectionCard>
         </div>
 
         {/* Delete Confirmation Dialog */}
@@ -384,7 +298,7 @@ export default function InstrumentDetailPage() {
             </DialogHeader>
 
             {deleteError && (
-              <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
+              <div className="rounded border border-error-border bg-error-bg p-2 text-xs text-error-text">
                 {deleteError}
               </div>
             )}

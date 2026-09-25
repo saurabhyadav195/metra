@@ -1,10 +1,12 @@
 /**
  * METRA — pages/admin/AdminDashboard.tsx
  * Route: /app/dashboard for admin role
- * Real database metrics for laboratory administration.
+ *
+ * Changes vs original:
+ * - P-1: Migrated from useState+useEffect to React Query
+ * - L-3: QuickActions extracted to reusable component
  */
 
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
@@ -15,31 +17,31 @@ import {
   FileTextIcon,
   ArrowRight01Icon,
 } from "@hugeicons/core-free-icons";
+import { useQuery } from "@tanstack/react-query";
 
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageHeader } from "@/components/common/PageHeader";
 import { MetricCard, MetricGrid } from "@/components/common/MetricCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { SectionCard } from "@/components/common/SectionCard";
+import { QuickActions } from "@/components/common/QuickActions";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
-import { getDashboardStats, type DashboardStats } from "@/services/api/dashboard";
-import { LoadingState } from "@/components/common/EmptyState";
+import { getDashboardStats } from "@/services/api/dashboard";
+import { LoadingState, ErrorState } from "@/components/common/EmptyState";
 import type { EvaluationStatus } from "@/types/evaluation";
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    document.title = "METRA — Admin Dashboard";
-    getDashboardStats()
-      .then(setStats)
-      .catch((err) => console.error("Failed to load admin stats:", err))
-      .finally(() => setLoading(false));
-  }, []);
+  document.title = "METRA — Admin Dashboard";
+
+  const { data: stats, isLoading, isError, refetch } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: getDashboardStats,
+    staleTime: 60_000,
+  });
 
   return (
     <AppLayout>
@@ -65,8 +67,14 @@ export default function AdminDashboard() {
           }
         />
 
-        {loading ? (
-          <LoadingState message="Loading laboratory stats..." />
+        {isLoading ? (
+          <LoadingState message="Loading laboratory stats…" />
+        ) : isError ? (
+          <ErrorState
+            title="Failed to load dashboard"
+            description="Could not retrieve laboratory statistics. Please try again."
+            onRetry={() => refetch()}
+          />
         ) : (
           <>
             <MetricGrid columns={4}>
@@ -164,34 +172,14 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <SectionCard title="Quick Management">
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2 h-9 text-xs"
-                      onClick={() => navigate("/app/instruments")}
-                    >
-                      <HugeiconsIcon icon={ScaleIcon} strokeWidth={2} className="size-4 text-primary" />
-                      Manage Instruments
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2 h-9 text-xs"
-                      onClick={() => navigate("/app/team")}
-                    >
-                      <HugeiconsIcon icon={UserGroupIcon} strokeWidth={2} className="size-4 text-success" />
-                      Manage Team
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-2 h-9 text-xs"
-                      onClick={() => navigate("/app/reports")}
-                    >
-                      <HugeiconsIcon icon={FileTextIcon} strokeWidth={2} className="size-4 text-info" />
-                      View Reports
-                    </Button>
-                  </div>
-                </SectionCard>
+                <QuickActions
+                  title="Quick Management"
+                  items={[
+                    { icon: ScaleIcon,          label: "Manage Instruments", href: "/app/instruments", iconColor: "text-primary" },
+                    { icon: UserGroupIcon,       label: "Manage Team",        href: "/app/team",        iconColor: "text-success" },
+                    { icon: FileTextIcon,        label: "View Reports",       href: "/app/reports",     iconColor: "text-info" },
+                  ]}
+                />
               </div>
             </div>
           </>
