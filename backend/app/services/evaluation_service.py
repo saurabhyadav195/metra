@@ -15,7 +15,8 @@ from app.engine.evaluator import RuleEvaluator, normalize_observation_payload
 from app.engine.calculator import (
     extract_repeatability_load_sets, extract_tilting_positions,
     extract_zero_return_steps, extract_stability_readings,
-    extract_voltage_variations_stages, extract_endurance_test_data
+    extract_voltage_variations_stages, extract_endurance_test_data,
+    extract_creep_readings, extract_zero_setting_range
 )
 from app.engine.rule_loader import get_rule_loader
 from app.engine.result_builder import ResultBuilder
@@ -648,6 +649,58 @@ class EvaluationService:
             ]
         }
 
+    def _calculate_creep_test(
+        self,
+        context: EvaluationContext,
+        observations: Dict[str, Any],
+        test_def: dict
+    ) -> Dict[str, Any]:
+        """
+        Creep test (TEST-A.4.11.1) — OIML R 76-1 §A.4.11.1 & §3.9.4.1
+        Computes unrounded indications P over timed readings under constant load,
+        variation delta_P(0->30m) <= 0.5 e, delta_P(15->30m) <= 0.2 e,
+        and optionally delta_P(0->4h) <= |MPE|.
+        """
+        if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
+            observations = observations["observations"]
+
+        observations = normalize_observation_payload(observations)
+        info = extract_creep_readings(observations, context)
+
+        if not info:
+            return {"status": "ERROR", "message": "No valid creep test observations provided.", "readings": []}
+
+        res = {
+            "status": info["result"],
+            "test_id": "TEST-A.4.11.1",
+            "applied_load": info["load"],
+            "load": info["load"],
+            "L": info["load"],
+            "active_e": info["active_e"],
+            "e": info["active_e"],
+            "mpe_value": round(info["mpe_value"], 6),
+            "delta_P_0_30": info["delta_P_0_30"],
+            "limit_0_30": info["limit_0_30"],
+            "pass_0_30": info["pass_0_30"],
+            "delta_P_15_30": info["delta_P_15_30"],
+            "limit_15_30": info["limit_15_30"],
+            "pass_15_30": info["pass_15_30"],
+            "delta_P_0_4h": info["delta_P_0_4h"],
+            "limit_0_4h": info["limit_0_4h"],
+            "pass_0_4h": info["pass_0_4h"],
+            "test_duration_min": info["test_duration_min"],
+            "termination_reason": info["termination_reason"],
+            "readings": info["readings"],
+            "rows": info["readings"],
+            "rule_references": [
+                {"rule_id": "CALC_CREEP_TEST", "section": "A.4.11.1 & 3.9.4.1", "page": 93, "standard": "OIML R 76-1", "edition": "2006 (E)"},
+                {"rule_id": "CREEP_LIMIT", "section": "3.9.4.1", "page": 35, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+            ]
+        }
+        if info["E0"] is not None:
+            res["E0"] = round(info["E0"], 6)
+        return res
+
     def _calculate_tilting_test(
         self,
         context: EvaluationContext,
@@ -655,7 +708,7 @@ class EvaluationService:
         test_def: dict
     ) -> Dict[str, Any]:
         """
-        Tilting test (TEST-A.4.11.1) — OIML R 76-1 §A.5.1 & §3.9.1
+        Tilting test (TEST-A.5.1) — OIML R 76-1 §A.5.1 & §3.9.1
         Computes position-wise unrounded indications P_v, zero-corrected indications P_v_0,
         and corrected errors Ec for each position entry in positions array.
         PASS if |Ec| <= MPE(L) for each position.
@@ -1200,71 +1253,9 @@ class EvaluationService:
         if isinstance(observations, dict) and "observations" in observations and isinstance(observations["observations"], dict):
             observations = observations["observations"]
 
-        Max = context.max_capacity
-        e1 = context.e1_resolution or context.e_resolution
-        zero_type = observations.get("zero_setting_type", "initial")
-
-        pos_pct = float(observations.get("positive_range") if observations.get("positive_range") is not None else observations.get("positive_limit_percent", 4.0))
-        neg_pct = float(observations.get("negative_range") if observations.get("negative_range") is not None else observations.get("negative_limit_percent", 1.0))
-
-        steps = observations.get("steps") or observations.get("rows") or observations.get("load_steps") or []
-        first_step = steps[0] if steps and isinstance(steps[0], dict) else {}
-
-        dL_val = observations.get("dL") if observations.get("dL") is not None else observations.get("additional_weight_changeover")
-        if dL_val is None:
-            dL_val = first_step.get("dL", 0.02)
-        dL = float(dL_val)
-
-        ind_val = observations.get("initial_indication") if observations.get("initial_indication") is not None else observations.get("initial_no_load_indication")
-        if ind_val is None:
-            ind_val = first_step.get("I", first_step.get("indication", observations.get("E0", 0.0)))
-        initial_ind = float(ind_val)
-
-        total_pct = pos_pct + neg_pct
-        max_allowed_pct = 20.0 if zero_type == "initial" else 4.0
-
-        pos_kg = (pos_pct / 100.0) * Max
-        neg_kg = (neg_pct / 100.0) * Max
-        max_allowed_kg = (max_allowed_pct / 100.0) * Max
-
-        passed = (total_pct <= max_allowed_pct) or (pos_pct <= max_allowed_pct and neg_pct <= max_allowed_pct)
-
-        E0 = round((initial_ind + 0.5 * e1 - dL) if dL > 0 else initial_ind, 6)
-
-        return {
-            "status": "PASS" if passed else "FAIL",
-            "Max": Max,
-            "e": context.e_resolution,
-            "e1": e1,
-            "multi_interval": context.weighing_intervals is not None,
-            "zero_setting_type": zero_type,
-            "positive_range_percent": pos_pct,
-            "negative_range_percent": neg_pct,
-            "total_range_percent": round(total_pct, 2),
-            "positive_range_kg": round(pos_kg, 4),
-            "negative_range_kg": round(neg_kg, 4),
-            "max_allowed_percent": max_allowed_pct,
-            "max_allowed_kg": round(max_allowed_kg, 4),
-            "E0": E0,
-            "rows": [
-                {
-                    "L": 0,
-                    "I": initial_ind,
-                    "dL": dL,
-                    "P": round(initial_ind + (0.5 * e1 if dL > 0 else 0.0) - dL, 6),
-                    "E": E0,
-                    "E0": E0,
-                    "Ec": E0,
-                    "active_e": e1,
-                    "mpe_value": round(max_allowed_kg, 4),
-                    "mpe_e": round(max_allowed_pct, 1),
-                    "result": "PASS" if passed else "FAIL"
-                }
-            ],
-            "rule_references": [
-                {"rule_id": "VAL_ZERO_SETTING_RANGE", "section": "4.5.1 & A.4.2.1", "page": 48, "standard": "OIML R 76-1", "edition": "2006 (E)"}
-            ]
-        }
+        observations = normalize_observation_payload(observations)
+        info = extract_zero_setting_range(observations, context)
+        return info
 
     async def calculate_test(
         self,
@@ -1328,7 +1319,9 @@ class EvaluationService:
             specialized_result = self._calculate_zero_setting_test(context, observations, test_def)
         elif test_id == "TEST-A.4.2.3":
             specialized_result = self._calculate_zero_setting_accuracy_test(context, observations, test_def)
-        elif test_id in ("TEST-A.4.11.1", "TEST-A.5.1", "tilting_test"):
+        elif test_id in ("TEST-A.4.11.1", "creep_test"):
+            specialized_result = self._calculate_creep_test(context, observations, test_def)
+        elif test_id in ("TEST-A.5.1", "tilting_test"):
             specialized_result = self._calculate_tilting_test(context, observations, test_def)
         elif test_id in ("TEST-A.4.11.2", "zero_return_test"):
             specialized_result = self._calculate_zero_return_test(context, observations, test_def)

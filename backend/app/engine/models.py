@@ -83,7 +83,7 @@ class CalculationResult(BaseModel):
     name: str
     formula: str
     inputs: Dict[str, Any]
-    output: Union[float, int, bool, Dict[str, Any]]
+    output: Optional[Union[float, int, bool, Dict[str, Any]]] = None
     unit: Optional[str] = None
     decision: Optional[str] = None  # PASS, FAIL, WARNING, N/A
     limit: Optional[Union[float, str]] = None

@@ -359,6 +359,8 @@ export default function ReportDetailPage() {
                     const rows = Array.isArray(calcObj?.rows) ? calcObj.rows : (Array.isArray(tr.calculations) ? tr.calculations : []);
                     if (!rows || rows.length === 0) return null;
 
+                    const isCreep = tr.clause === "A.4.11.1" || tr.test_id === "TEST-A.4.11.1" || calcObj?.delta_P_0_30 !== undefined;
+
                     return (
                       <div key={idx} className="rounded border border-slate-200 bg-slate-50/50 p-3 space-y-2">
                         <div className="flex justify-between items-center border-b border-slate-200 pb-1 text-xs">
@@ -366,7 +368,7 @@ export default function ReportDetailPage() {
                             {tr.clause} — {tr.test_name}
                           </span>
                           <span className="font-mono text-[11px] font-semibold text-slate-600">
-                            {rows.length} Load Step(s) Evaluated
+                            {rows.length} {isCreep ? "Creep Timed Reading(s)" : "Load Step(s)"} Evaluated
                           </span>
                         </div>
 
@@ -374,16 +376,56 @@ export default function ReportDetailPage() {
                           <table className="w-full text-left text-[11px] font-mono">
                             <thead>
                               <tr className="border-b border-slate-300 font-semibold text-slate-700 bg-slate-100">
-                                <th className="p-1.5">Load L</th>
-                                <th className="p-1.5">Indication I</th>
-                                <th className="p-1.5">Error E</th>
-                                <th className="p-1.5">Corrected Ec</th>
-                                <th className="p-1.5">MPE Limit</th>
-                                <th className="p-1.5 text-right">Result</th>
+                                {isCreep ? (
+                                  <>
+                                    <th className="p-1.5">Time</th>
+                                    <th className="p-1.5">Load L</th>
+                                    <th className="p-1.5">Indication I</th>
+                                    <th className="p-1.5 text-amber-700">ΔL</th>
+                                    <th className="p-1.5">P</th>
+                                    <th className="p-1.5 font-bold text-slate-900">ΔP</th>
+                                    <th className="p-1.5 text-right">Result</th>
+                                  </>
+                                ) : (
+                                  <>
+                                    <th className="p-1.5">Load L</th>
+                                    <th className="p-1.5">Indication I</th>
+                                    <th className="p-1.5">Error E</th>
+                                    <th className="p-1.5">Corrected Ec</th>
+                                    <th className="p-1.5">MPE Limit</th>
+                                    <th className="p-1.5 text-right">Result</th>
+                                  </>
+                                )}
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-200">
                               {rows.slice(0, 15).map((row: any, rIdx: number) => {
+                                if (isCreep) {
+                                  const timeStr = `${row?.time_min ?? row?.time ?? 0} min`;
+                                  const loadVal = row?.load ?? row?.L ?? calcObj?.load ?? 15.0;
+                                  const I = row?.I ?? row?.indication ?? 0;
+                                  const dL = row?.dL ?? row?.changeover ?? 0;
+                                  const P = row?.P ?? 0;
+                                  const dP = row?.delta_P ?? 0;
+                                  const res = row?.result ?? row?.decision ?? "PASS";
+
+                                  return (
+                                    <tr key={rIdx}>
+                                      <td className="p-1.5 font-semibold">{timeStr}</td>
+                                      <td className="p-1.5">{Number(loadVal).toFixed(3)} kg</td>
+                                      <td className="p-1.5">{Number(I).toFixed(3)} kg</td>
+                                      <td className="p-1.5 text-amber-700">{Number(dL).toFixed(4)} kg</td>
+                                      <td className="p-1.5 font-mono">{Number(P).toFixed(4)} kg</td>
+                                      <td className="p-1.5 font-bold text-slate-900">{dP === 0 ? "0" : Number(dP).toFixed(4)} kg</td>
+                                      <td className="p-1.5 text-right font-bold">
+                                        <span className={res === "PASS" ? "text-emerald-700" : "text-rose-700"}>
+                                          {res}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  );
+                                }
+
                                 const L = row.L ?? row.load ?? 0;
                                 const I = row.I ?? row.indication ?? 0;
                                 const E = row.E !== undefined ? row.E : (I - L);

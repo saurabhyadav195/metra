@@ -456,9 +456,29 @@ export default function TestExecutionPage() {
   const calcObj = (calcResult as any)?.calculations || calcResult;
   const calcRows: any[] = Array.isArray(calcObj?.rows)
     ? calcObj.rows
+    : Array.isArray(calcObj?.readings)
+    ? calcObj.readings
     : Array.isArray((calcResult as any)?.rows)
     ? (calcResult as any).rows
+    : Array.isArray((calcResult as any)?.readings)
+    ? (calcResult as any).readings
     : [];
+
+  const isCreepTest =
+    testId === "TEST-A.4.11.1" ||
+    testDetail?.test_id === "TEST-A.4.11.1" ||
+    (calcResult as any)?.test_id === "TEST-A.4.11.1" ||
+    (calcResult as any)?.delta_P_0_30 !== undefined ||
+    (calcObj as any)?.delta_P_0_30 !== undefined;
+
+  const isZeroSettingRangeTest =
+    testId === "TEST-A.4.2.1" ||
+    testDetail?.test_id === "TEST-A.4.2.1" ||
+    (calcResult as any)?.test_id === "TEST-A.4.2.1" ||
+    (calcResult as any)?.zero_setting_type !== undefined ||
+    (calcObj as any)?.zero_setting_type !== undefined ||
+    (calcResult as any)?.total_range_pct !== undefined ||
+    (calcObj as any)?.total_range_pct !== undefined;
 
   const ruleRefs: any[] = Array.isArray((calcResult as any)?.rule_references) && (calcResult as any).rule_references.length > 0
     ? (calcResult as any).rule_references
@@ -500,16 +520,7 @@ export default function TestExecutionPage() {
           </div>
         )}
 
-        {/* Dynamic Test Observation Card — wrapped in ErrorBoundary.
-            KEY FIX 3: The key={testId} prop on ErrorBoundary forces React to
-            unmount and remount the entire subtree whenever testId changes.
-            This guarantees:
-              (a) No stale local state from a previous form leaks into the next
-              (b) The ErrorBoundary's own hasError state is reset on navigation
-                  (an ErrorBoundary does NOT auto-reset between route changes
-                   unless it is remounted — this was causing the "stuck" error
-                   screen after the first crash)
-        */}
+        {/* Dynamic Test Observation Card — wrapped in ErrorBoundary */}
         <SectionCard
           title="Test Observations & Inputs"
           description={`Verified OIML clause ${clause} laboratory measurement fields`}
@@ -539,8 +550,213 @@ export default function TestExecutionPage() {
                 <ResultBadge result={((calcResult as any).status || (calcResult as any).overall_decision || "PASS") as any} />
               </div>
 
-              {/* Calculation Outputs / Table */}
-              {calcRows.length > 0 ? (
+              {/* Specialized Presentation for CREEP TEST (OIML §A.4.11.1) */}
+              {isCreepTest ? (
+                <div className="space-y-4">
+                  {/* 1. Creep Criteria Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    {/* 30-min criterion card */}
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">30-Minute Creep Criterion</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          (calcObj?.pass_0_30 ?? (calcResult as any)?.pass_0_30) !== false
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-destructive/10 text-destructive"
+                        }`}>
+                          {(calcObj?.pass_0_30 ?? (calcResult as any)?.pass_0_30) !== false ? "PASS" : "FAIL"}
+                        </span>
+                      </div>
+                      <p className="text-xs font-mono text-muted-foreground">
+                        ΔP(30) = <span className="font-bold text-foreground">
+                          {calcObj?.delta_P_0_30 ?? (calcResult as any)?.delta_P_0_30 ?? "—"} kg
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Limit (0.5e) = <span className="font-medium text-foreground">
+                          {calcObj?.limit_0_30 ?? (calcResult as any)?.limit_0_30 ?? "—"} kg
+                        </span>
+                        {(calcObj?.active_e ?? (calcResult as any)?.active_e) ? ` (e = ${calcObj?.active_e ?? (calcResult as any)?.active_e} kg)` : ""}
+                      </p>
+                    </div>
+
+                    {/* 15-to-30 min criterion card */}
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">15–30 Minute Criterion</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          (calcObj?.pass_15_30 ?? (calcResult as any)?.pass_15_30) !== false
+                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                            : "bg-destructive/10 text-destructive"
+                        }`}>
+                          {(calcObj?.pass_15_30 ?? (calcResult as any)?.pass_15_30) !== false ? "PASS" : "FAIL"}
+                        </span>
+                      </div>
+                      <p className="text-xs font-mono text-muted-foreground">
+                        |P₃₀ − P₁₅| = <span className="font-bold text-foreground">
+                          {calcObj?.delta_P_15_30 ?? (calcResult as any)?.delta_P_15_30 ?? "—"} kg
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Limit (0.2e) = <span className="font-medium text-foreground">
+                          {calcObj?.limit_15_30 ?? (calcResult as any)?.limit_15_30 ?? "—"} kg
+                        </span>
+                      </p>
+                    </div>
+
+                    {/* Test Duration & Termination Status */}
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground">Test Duration & Status</span>
+                        <span className="text-xs font-mono font-medium text-primary">
+                          {calcObj?.test_duration_min ?? (calcResult as any)?.test_duration_min ?? 30} min
+                        </span>
+                      </div>
+                      <p className="text-xs font-medium text-foreground">
+                        {calcObj?.termination_reason || (calcResult as any)?.termination_reason || "30 minutes — permitted to terminate"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {(calcObj?.E0 ?? (calcResult as any)?.E0) !== undefined && (calcObj?.E0 ?? (calcResult as any)?.E0) !== null
+                          ? `Initial Zero Error (E₀): ${calcObj?.E0 ?? (calcResult as any)?.E0} kg`
+                          : "Initial Zero Error (E₀): Not recorded"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 2. Creep Observations Table */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                        Creep Time-Series Observations & Calculations (OIML §A.4.11.1)
+                      </p>
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        Applied Load L = {Number(calcObj?.load ?? calcObj?.applied_load ?? (calcResult as any)?.load ?? (calcResult as any)?.applied_load ?? (calcRows[0]?.load) ?? (calcRows[0]?.L) ?? 15.0).toFixed(3)} kg | e = {calcObj?.active_e ?? (calcResult as any)?.active_e ?? 0.005} kg
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto rounded border border-border">
+                      <table className="w-full text-left text-xs font-mono">
+                        <thead>
+                          <tr className="border-b border-border bg-muted/70 font-medium text-foreground">
+                            <th className="py-2.5 px-3">Time</th>
+                            <th className="py-2.5 px-3">Load L</th>
+                            <th className="py-2.5 px-3">Indication I</th>
+                            <th className="py-2.5 px-3 text-amber-600 dark:text-amber-400">ΔL</th>
+                            <th className="py-2.5 px-3">P</th>
+                            <th className="py-2.5 px-3 font-bold text-primary">ΔP</th>
+                            <th className="py-2.5 px-3 text-right">Result</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {calcRows.map((row: any, idx: number) => {
+                            const timeStr = `${row?.time_min ?? row?.time ?? 0} min`;
+                            const loadVal = row?.load ?? row?.L ?? row?.applied_load ?? calcObj?.load ?? calcObj?.applied_load ?? (calcResult as any)?.load ?? 15.0;
+                            const indVal = row?.I ?? row?.indication ?? 0;
+                            const dLVal = row?.dL ?? row?.changeover ?? 0;
+                            const PVal = row?.P ?? 0;
+                            const dPVal = row?.delta_P ?? 0;
+                            const res = row?.result ?? row?.decision ?? "PASS";
+
+                            return (
+                              <tr key={idx} className="hover:bg-muted/40 transition-colors">
+                                <td className="py-1.5 px-3 font-semibold">{timeStr}</td>
+                                <td className="py-1.5 px-3">{Number(loadVal).toFixed(3)} kg</td>
+                                <td className="py-1.5 px-3">{Number(indVal).toFixed(3)} kg</td>
+                                <td className="py-1.5 px-3 text-amber-600 dark:text-amber-400">{Number(dLVal).toFixed(4)} kg</td>
+                                <td className="py-1.5 px-3 font-mono">{Number(PVal).toFixed(4)} kg</td>
+                                <td className="py-1.5 px-3 font-bold text-primary">{dPVal === 0 ? "0" : Number(dPVal).toFixed(4)} kg</td>
+                                <td className="py-1.5 px-3 text-right font-bold">
+                                  <span className={res === "PASS" ? "text-emerald-600" : "text-destructive"}>
+                                    {res}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : isZeroSettingRangeTest ? (
+                <div className="space-y-4">
+                  {/* Status message banner if INCOMPLETE or message available */}
+                  {(calcObj?.status === "INCOMPLETE" || (calcResult as any)?.status === "INCOMPLETE" || calcObj?.message) && (
+                    <div className={`rounded-lg border p-3 flex items-center gap-2 text-xs font-medium ${
+                      (calcObj?.status === "INCOMPLETE" || (calcResult as any)?.status === "INCOMPLETE")
+                        ? "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                        : "border-primary/30 bg-primary/10 text-primary"
+                    }`}>
+                      <HugeiconsIcon icon={AlertCircleIcon} strokeWidth={2} className="size-4 shrink-0" />
+                      <span>{calcObj?.message || (calcResult as any)?.summary_message || "Source measurement unavailable — enter laboratory measurement."}</span>
+                    </div>
+                  )}
+
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                    {/* Method Card */}
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Zero-Setting Method</span>
+                      <p className="text-sm font-bold text-foreground">
+                        {calcObj?.zero_setting_method || (calcObj?.zero_setting_type ? String(calcObj.zero_setting_type).replace('_', '-') : "Initial")}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        OIML Clause A.4.2.1
+                      </p>
+                    </div>
+
+                    {/* Positive Range Card */}
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Positive Range</span>
+                      <p className="text-sm font-mono font-bold text-foreground">
+                        {calcObj?.positive_range_kg !== undefined && calcObj?.positive_range_kg !== null
+                          ? `${calcObj.positive_range_kg} ${calcObj.unit || 'kg'}`
+                          : "—"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Measured positive portion
+                      </p>
+                    </div>
+
+                    {/* Negative Range Card */}
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Negative Range</span>
+                      <p className="text-sm font-mono font-bold text-foreground">
+                        {calcObj?.negative_applicable === false
+                          ? "N/A (Non-removable)"
+                          : calcObj?.negative_range_kg !== undefined && calcObj?.negative_range_kg !== null
+                          ? `${calcObj.negative_range_kg} ${calcObj.unit || 'kg'}`
+                          : "—"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {calcObj?.negative_applicable === false ? "Load receptor non-removable" : "Measured negative portion"}
+                      </p>
+                    </div>
+
+                    {/* Total Range & Limit Card */}
+                    <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-1">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Total Range & Limit</span>
+                      <p className="text-sm font-mono font-bold text-primary">
+                        {calcObj?.total_range_kg !== undefined && calcObj?.total_range_kg !== null
+                          ? `${calcObj.total_range_kg} ${calcObj.unit || 'kg'} (${calcObj.total_range_pct}% Max)`
+                          : "—"}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        Limit: ≤ {calcObj?.max_allowed_pct || 20}% Max ({calcObj?.max_allowed_kg || "—"} {calcObj?.unit || 'kg'})
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Summary Footer Box */}
+                  <div className="rounded-md border border-border bg-muted/10 p-3 flex items-center justify-between text-xs">
+                    <div>
+                      <span className="font-semibold text-foreground">Rule ID: </span>
+                      <span className="font-mono text-primary font-bold">VAL_ZERO_SETTING_RANGE</span>
+                      <span className="text-muted-foreground ml-2">| OIML R 76-1 §4.5.1 & §A.4.2.1</span>
+                    </div>
+                    <ResultBadge result={((calcObj?.status || (calcResult as any)?.status || "IN_PROGRESS") as any)} />
+                  </div>
+                </div>
+              ) : calcRows.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
                     Calculated Observations & MPE Evaluation

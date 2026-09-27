@@ -107,11 +107,11 @@ export default function EvaluationSetupPage() {
           { label: "Instruments", href: "/app/instruments" },
           ...(instrument
             ? [
-                {
-                  label: `${instrument.manufacturer} ${instrument.model}`,
-                  href: `/app/instruments/${id}`,
-                },
-              ]
+              {
+                label: `${instrument.manufacturer} ${instrument.model}`,
+                href: `/app/instruments/${id}`,
+              },
+            ]
             : []),
           { label: "Evaluation Setup" },
         ]}
@@ -218,7 +218,7 @@ export default function EvaluationSetupPage() {
                     id="temperature"
                     type="number"
                     step="0.1"
-                    placeholder="23.0"
+                    placeholder="e.g. 23.0"
                     className="h-9 text-sm"
                     {...register("temperature_c")}
                   />
@@ -230,7 +230,7 @@ export default function EvaluationSetupPage() {
                     id="humidity"
                     type="number"
                     step="0.1"
-                    placeholder="50.0"
+                    placeholder="e.g. 50.0"
                     className="h-9 text-sm"
                     {...register("relative_humidity_pct")}
                   />
@@ -242,7 +242,7 @@ export default function EvaluationSetupPage() {
                     id="pressure"
                     type="number"
                     step="0.1"
-                    placeholder="1013.25"
+                    placeholder="e.g. 1013.25"
                     className="h-9 text-sm"
                     {...register("atmospheric_pressure_hpa")}
                   />
@@ -253,7 +253,7 @@ export default function EvaluationSetupPage() {
                   <Input
                     id="location"
                     type="text"
-                    placeholder="Metrology Lab Room 1"
+                    placeholder="e.g. Metrology Lab Room 1"
                     className="h-9 text-sm"
                     {...register("test_location")}
                   />
@@ -263,7 +263,7 @@ export default function EvaluationSetupPage() {
                   <Label htmlFor="notes">Evaluation Notes</Label>
                   <Textarea
                     id="notes"
-                    placeholder="General test conditions, setup observations..."
+                    placeholder="e.g. General test conditions, setup observations..."
                     className="resize-none text-sm"
                     rows={3}
                     {...register("notes")}

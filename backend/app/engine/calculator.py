@@ -186,9 +186,155 @@ def extract_repeatability_load_sets(observations: Dict[str, Any], context: Evalu
     return load_groups
 
 
+def extract_creep_readings(observations: Dict[str, Any], context: EvaluationContext) -> Optional[Dict[str, Any]]:
+    """
+    Parses observation payload for Creep Test (TEST-A.4.11.1 / OIML R 76-1 §A.4.11.1 & §3.9.4.1).
+    Extracts load, optional E0, and time-series readings (time_min, indication, dL).
+    Calculates unrounded indication P = I + 0.5 * active_e - dL (if dL > 0 else I).
+    Evaluates creep variation:
+      - delta_P(0 -> 30 min) <= 0.5 * e
+      - delta_P(15 -> 30 min) <= 0.2 * e
+      - delta_P(0 -> 4 h) <= |MPE(load)| (if 4h reading present)
+    """
+    if not isinstance(observations, dict):
+        return None
+
+    raw_readings = observations.get("readings") or observations.get("rows") or observations.get("steps")
+    if not isinstance(raw_readings, list) or len(raw_readings) == 0:
+        return None
+
+    load_val = float(observations.get("load") if observations.get("load") is not None else (observations.get("applied_load") if observations.get("applied_load") is not None else (observations.get("L") if observations.get("L") is not None else 0.0)))
+    
+    has_E0 = "E0" in observations or "E_0" in observations or "initial_zero_error" in observations
+    E0_val = None
+    if has_E0:
+        raw_e0 = observations.get("E0") if "E0" in observations else (observations.get("E_0") if "E_0" in observations else observations.get("initial_zero_error"))
+        if raw_e0 is not None and raw_e0 != "":
+            try:
+                E0_val = float(raw_e0)
+            except (ValueError, TypeError):
+                E0_val = None
+
+    from app.engine.mpe_engine import MPEEngine
+    mpe_engine = MPEEngine()
+
+    mpe_res = mpe_engine.calculate_mpe(
+        accuracy_class=context.accuracy_class,
+        load=load_val,
+        e_resolution=context.e_resolution,
+        unit=context.unit,
+        verification_type=context.verification_type,
+        intervals=context.weighing_intervals
+    )
+    active_e = mpe_res.source.get("active_e", context.e_resolution) if mpe_res.source else context.e_resolution
+
+    parsed_readings = []
+    for idx, r in enumerate(raw_readings):
+        if not isinstance(r, dict):
+            continue
+        t_min = float(r.get("time_min") if r.get("time_min") is not None else (r.get("time") if r.get("time") is not None else (r.get("t") if r.get("t") is not None else 0)))
+        I_val = float(r.get("I") if r.get("I") is not None else (r.get("indication") if r.get("indication") is not None else (r.get("indicated_value") if r.get("indicated_value") is not None else 0.0)))
+        dL_val = float(r.get("dL") if r.get("dL") is not None else (r.get("changeover") if r.get("changeover") is not None else (r.get("delta_L") if r.get("delta_L") is not None else 0.0)))
+
+        P_val = round(I_val + (0.5 * active_e if dL_val > 0 else 0.0) - dL_val, 6)
+        
+        item = {
+            "step_index": idx + 1,
+            "time_min": t_min,
+            "load": load_val,
+            "L": load_val,
+            "applied_load": load_val,
+            "I": I_val,
+            "dL": dL_val,
+            "P": P_val,
+        }
+        if E0_val is not None:
+            item["E0"] = E0_val
+            item["E"] = round(P_val - load_val - E0_val, 6)
+        else:
+            item["E"] = round(P_val - load_val, 6)
+
+        parsed_readings.append(item)
+
+    if not parsed_readings:
+        return None
+
+    parsed_readings.sort(key=lambda x: x["time_min"])
+
+    # Map key timepoints
+    r_0 = next((r for r in parsed_readings if abs(r["time_min"] - 0) < 1e-3), parsed_readings[0])
+    r_0_P = r_0["P"]
+
+    limit_0_30 = round(0.5 * active_e, 6)
+    limit_15_30 = round(0.2 * active_e, 6)
+    limit_0_4h = round(abs(mpe_res.mpe_value), 6)
+
+    # Attach per-row delta_P and compliance
+    for r in parsed_readings:
+        dP = round(abs(r["P"] - r_0_P), 6)
+        r["delta_P"] = dP
+        r["result"] = "PASS" if (dP <= limit_0_30 + 1e-9) else "FAIL"
+
+    r_15 = next((r for r in parsed_readings if abs(r["time_min"] - 15) < 1e-3), None)
+    r_30 = next((r for r in parsed_readings if abs(r["time_min"] - 30) < 1e-3), None)
+    if not r_30 and len(parsed_readings) >= 2:
+        r_30 = parsed_readings[-1]
+
+    r_4h = next((r for r in parsed_readings if r["time_min"] >= 240 or abs(r["time_min"] - 240) < 1e-3), None)
+
+    delta_P_0_30 = round(abs(r_30["P"] - r_0["P"]), 6) if (r_0 and r_30) else None
+    pass_0_30 = (delta_P_0_30 <= limit_0_30 + 1e-9) if delta_P_0_30 is not None else False
+
+    delta_P_15_30 = round(abs(r_30["P"] - r_15["P"]), 6) if (r_15 and r_30) else None
+    pass_15_30 = (delta_P_15_30 <= limit_15_30 + 1e-9) if delta_P_15_30 is not None else True
+
+    delta_P_0_4h = round(abs(r_4h["P"] - r_0["P"]), 6) if (r_0 and r_4h) else None
+    pass_0_4h = (delta_P_0_4h <= limit_0_4h + 1e-9) if delta_P_0_4h is not None else True
+
+    if pass_0_30 and pass_15_30:
+        overall_result = "PASS"
+        termination_reason = "30 minutes — permitted to terminate"
+    elif r_4h is not None:
+        overall_result = "PASS" if pass_0_4h else "FAIL"
+        termination_reason = "4 hours — completed"
+    else:
+        overall_result = "FAIL"
+        termination_reason = "30 minutes — 15-30 min condition not met (requires 4h extension)"
+
+    max_time = int(max(r["time_min"] for r in parsed_readings))
+
+    return {
+        "load": load_val,
+        "applied_load": load_val,
+        "L": load_val,
+        "E0": E0_val,
+        "active_e": active_e,
+        "e": active_e,
+        "mpe_value": mpe_res.mpe_value,
+        "mpe_e": mpe_res.mpe_e,
+        "readings": parsed_readings,
+        "r_0": r_0,
+        "r_15": r_15,
+        "r_30": r_30,
+        "r_4h": r_4h,
+        "delta_P_0_30": delta_P_0_30,
+        "limit_0_30": limit_0_30,
+        "pass_0_30": pass_0_30,
+        "delta_P_15_30": delta_P_15_30,
+        "limit_15_30": limit_15_30,
+        "pass_15_30": pass_15_30,
+        "delta_P_0_4h": delta_P_0_4h,
+        "limit_0_4h": limit_0_4h,
+        "pass_0_4h": pass_0_4h,
+        "test_duration_min": max_time,
+        "termination_reason": termination_reason,
+        "result": overall_result
+    }
+
+
 def extract_tilting_positions(observations: Dict[str, Any], context: EvaluationContext) -> List[Dict[str, Any]]:
     """
-    Parses observation payload for Tilting Test (TEST-A.4.11.1) into structured position items.
+    Parses observation payload for Tilting Test (TEST-A.5.1) into structured position items.
     Checks 'positions', 'tilt_positions', 'rows', or 'steps'.
     Computes unrounded indication P_v, zero-corrected indication P_v_0, corrected error Ec, and resolves MPE limit.
     """
@@ -755,6 +901,136 @@ def extract_endurance_test_data(observations: Dict[str, Any], context: Evaluatio
     }
 
 
+def extract_zero_setting_range(observations: Dict[str, Any], context: EvaluationContext) -> Dict[str, Any]:
+    """
+    Parses observation payload for Range of Zero-Setting Test (TEST-A.4.2.1 / OIML R 76-1 §A.4.2.1 & §4.5.1).
+    Extracts zero-setting method (initial, non_automatic, semi_automatic, automatic),
+    negative portion applicability, and measured positive and negative zero-setting ranges.
+    Calculates total range and evaluates against allowed limit:
+      - Initial zero-setting: total range <= 20% Max
+      - Non-automatic / Semi-automatic / Automatic zero-setting: total range <= 4% Max
+    If measurements are not provided or blank, returns status 'INCOMPLETE'.
+    """
+    if not isinstance(observations, dict):
+        return {
+            "status": "INCOMPLETE",
+            "message": "Source measurement unavailable — enter laboratory measurement.",
+            "test_id": "TEST-A.4.2.1",
+            "rows": []
+        }
+
+    zero_type = str(
+        observations.get("zero_setting_type") or
+        observations.get("zero_type") or
+        observations.get("zero_setting_method") or
+        observations.get("method") or
+        "initial"
+    ).lower()
+
+    if "initial" in zero_type:
+        method_key = "initial"
+        method_label = "Initial zero-setting"
+    elif "non" in zero_type:
+        method_key = "non_automatic"
+        method_label = "Non-automatic zero-setting"
+    elif "semi" in zero_type:
+        method_key = "semi_automatic"
+        method_label = "Semi-automatic zero-setting"
+    elif "auto" in zero_type:
+        method_key = "automatic"
+        method_label = "Automatic zero-setting"
+    else:
+        method_key = "initial"
+        method_label = "Initial zero-setting"
+
+    neg_app_val = observations.get("negative_applicable")
+    if neg_app_val is None:
+        neg_app_val = observations.get("negative_portion_applicable")
+    negative_applicable = True if neg_app_val is None else bool(neg_app_val)
+
+    pos_raw = (
+        observations.get("positive_range_kg") if observations.get("positive_range_kg") is not None else (
+            observations.get("positive_range") if observations.get("positive_range") is not None else (
+                observations.get("pos_range_kg") if observations.get("pos_range_kg") is not None else (
+                    observations.get("pos_range")
+                )
+            )
+        )
+    )
+
+    neg_raw = (
+        observations.get("negative_range_kg") if observations.get("negative_range_kg") is not None else (
+            observations.get("negative_range") if observations.get("negative_range") is not None else (
+                observations.get("neg_range_kg") if observations.get("neg_range_kg") is not None else (
+                    observations.get("neg_range")
+                )
+            )
+        )
+    )
+
+    def parse_range_val(val: Any) -> Optional[float]:
+        if val is None or str(val).strip() == "":
+            return None
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return None
+
+    pos_val = parse_range_val(pos_raw)
+    neg_val = parse_range_val(neg_raw)
+
+    Max = float(context.max_capacity) if context.max_capacity else 0.0
+    max_allowed_pct = 20.0 if method_key == "initial" else 4.0
+    max_allowed_kg = round((max_allowed_pct / 100.0) * Max, 4) if Max > 0 else 0.0
+
+    if pos_val is None or (negative_applicable and neg_val is None):
+        return {
+            "status": "INCOMPLETE",
+            "message": "Source measurement unavailable — enter laboratory measurement.",
+            "test_id": "TEST-A.4.2.1",
+            "zero_setting_type": method_key,
+            "zero_setting_method": method_label,
+            "negative_applicable": negative_applicable,
+            "positive_range_kg": pos_val,
+            "negative_range_kg": neg_val if negative_applicable else None,
+            "total_range_kg": None,
+            "total_range_pct": None,
+            "max_allowed_pct": max_allowed_pct,
+            "max_allowed_kg": max_allowed_kg,
+            "Max": Max,
+            "unit": context.unit,
+            "rows": []
+        }
+
+    pos_kg = float(pos_val)
+    neg_kg = float(neg_val) if negative_applicable else 0.0
+    total_kg = round(pos_kg + neg_kg, 6)
+
+    total_pct = round((total_kg / Max * 100.0), 4) if Max > 0 else 0.0
+    passed = (total_kg <= max_allowed_kg + 1e-9) if Max > 0 else True
+
+    return {
+        "status": "PASS" if passed else "FAIL",
+        "message": f"Total zero-setting range {total_kg} {context.unit} ({total_pct}% Max) <= limit {max_allowed_kg} {context.unit} ({max_allowed_pct}% Max)" if passed else f"Total zero-setting range {total_kg} {context.unit} ({total_pct}% Max) exceeds limit {max_allowed_kg} {context.unit} ({max_allowed_pct}% Max)",
+        "test_id": "TEST-A.4.2.1",
+        "zero_setting_type": method_key,
+        "zero_setting_method": method_label,
+        "negative_applicable": negative_applicable,
+        "positive_range_kg": pos_kg,
+        "negative_range_kg": neg_kg if negative_applicable else None,
+        "total_range_kg": total_kg,
+        "total_range_pct": total_pct,
+        "max_allowed_pct": max_allowed_pct,
+        "max_allowed_kg": max_allowed_kg,
+        "Max": Max,
+        "unit": context.unit,
+        "rows": [],
+        "rule_references": [
+            {"rule_id": "VAL_ZERO_SETTING_RANGE", "section": "4.5.1 & A.4.2.1", "page": 48, "standard": "OIML R 76-1", "edition": "2006 (E)"}
+        ]
+    }
+
+
 class CalculationEngine:
     def __init__(self):
         self.loader = get_rule_loader()
@@ -775,6 +1051,109 @@ class CalculationEngine:
         rule = self.loader.get_calculation_rule(rule_id)
         if not rule:
             # Check if this is a specialized calculation rule ID
+            if rule_id in ("CALC_ZERO_SETTING_RANGE", "VAL_ZERO_SETTING_RANGE", "ZERO_SETTING_RANGE"):
+                info = extract_zero_setting_range(observations, context)
+                if not info:
+                    return []
+                if info.get("status") == "INCOMPLETE":
+                    return [CalculationResult(
+                        calculation_id="VAL_ZERO_SETTING_RANGE",
+                        name=f"Range of zero-setting ({info.get('zero_setting_method', 'Initial zero-setting')})",
+                        formula="Total Range = Positive Range + Negative Range; Limit <= 20% Max (Initial) or <= 4% Max",
+                        inputs=observations,
+                        output=None,
+                        unit=context.unit,
+                        decision=None,
+                        limit=info.get("max_allowed_kg"),
+                        source={"standard": "OIML R 76-1", "edition": "2006 (E)", "section": "4.5.1 & A.4.2.1", "page": 48}
+                    )]
+                return [CalculationResult(
+                    calculation_id="VAL_ZERO_SETTING_RANGE",
+                    name=f"Range of zero-setting ({info['zero_setting_method']})",
+                    formula="Total Range = Positive Range + Negative Range; Limit <= 20% Max (Initial) or <= 4% Max",
+                    inputs={
+                        "zero_setting_type": info["zero_setting_type"],
+                        "zero_setting_method": info["zero_setting_method"],
+                        "negative_applicable": info["negative_applicable"],
+                        "positive_range_kg": info["positive_range_kg"],
+                        "negative_range_kg": info["negative_range_kg"],
+                        "total_range_kg": info["total_range_kg"],
+                        "total_range_pct": info["total_range_pct"],
+                        "max_allowed_pct": info["max_allowed_pct"],
+                        "max_allowed_kg": info["max_allowed_kg"],
+                        "Max": info["Max"]
+                    },
+                    output=info["total_range_kg"],
+                    unit=context.unit,
+                    decision=info["status"],
+                    limit=info["max_allowed_kg"],
+                    source={"standard": "OIML R 76-1", "edition": "2006 (E)", "section": "4.5.1 & A.4.2.1", "page": 48}
+                )]
+
+            if rule_id in ("CALC_CREEP_TEST", "CREEP_LIMIT"):
+                info = extract_creep_readings(observations, context)
+                if not info:
+                    return []
+                results: List[CalculationResult] = []
+                source = {"standard": "OIML R 76-1", "edition": "2006 (E)", "section": "A.4.11.1 & 3.9.4.1", "page": 93}
+
+                if info["delta_P_0_30"] is not None:
+                    results.append(CalculationResult(
+                        calculation_id="CALC_CREEP_0_30",
+                        name="Creep variation (0 to 30 min)",
+                        formula="delta_P_0_30 = abs(P_30m - P_0m); P = I + 0.5 * e - dL",
+                        inputs={
+                            "load": info["load"],
+                            "P_0m": round(info["r_0"]["P"], 6),
+                            "P_30m": round(info["r_30"]["P"], 6),
+                            "delta_P_0_30": info["delta_P_0_30"],
+                            "limit": info["limit_0_30"],
+                            "active_e": info["active_e"]
+                        },
+                        output=info["delta_P_0_30"],
+                        unit=context.unit,
+                        decision="PASS" if info["pass_0_30"] else "FAIL",
+                        limit=info["limit_0_30"],
+                        source=source
+                    ))
+                if info["delta_P_15_30"] is not None:
+                    results.append(CalculationResult(
+                        calculation_id="CALC_CREEP_15_30",
+                        name="Creep variation (15 to 30 min)",
+                        formula="delta_P_15_30 = abs(P_30m - P_15m); P = I + 0.5 * e - dL",
+                        inputs={
+                            "P_15m": round(info["r_15"]["P"], 6) if info["r_15"] else None,
+                            "P_30m": round(info["r_30"]["P"], 6),
+                            "delta_P_15_30": info["delta_P_15_30"],
+                            "limit": info["limit_15_30"],
+                            "active_e": info["active_e"]
+                        },
+                        output=info["delta_P_15_30"],
+                        unit=context.unit,
+                        decision="PASS" if info["pass_15_30"] else "FAIL",
+                        limit=info["limit_15_30"],
+                        source=source
+                    ))
+                if info["delta_P_0_4h"] is not None:
+                    results.append(CalculationResult(
+                        calculation_id="CALC_CREEP_0_4H",
+                        name="Creep variation (0 to 4 hours)",
+                        formula="delta_P_0_4h = abs(P_4h - P_0m); limit = |mpe|",
+                        inputs={
+                            "P_0m": round(info["r_0"]["P"], 6),
+                            "P_4h": round(info["r_4h"]["P"], 6),
+                            "delta_P_0_4h": info["delta_P_0_4h"],
+                            "limit": info["limit_0_4h"],
+                            "mpe": info["mpe_value"]
+                        },
+                        output=info["delta_P_0_4h"],
+                        unit=context.unit,
+                        decision="PASS" if info["pass_0_4h"] else "FAIL",
+                        limit=info["limit_0_4h"],
+                        source=source
+                    ))
+                return results
+
             if rule_id in ("CALC_TILTING_TEST", "TILTING_LIMIT"):
                 positions_data = extract_tilting_positions(observations, context)
                 if not positions_data:

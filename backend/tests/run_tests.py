@@ -13,10 +13,12 @@ from tests.test_rule_engine import (
     test_input_validator,
     test_rule_evaluator_pass,
     test_zero_setting_accuracy_test,
+    test_range_of_zero_setting_test,
     test_multi_row_array_iteration,
     test_tare_weighing_i_net_mapping,
     test_multi_set_repeatability_evaluation,
     test_tilting_test_position_evaluation,
+    test_creep_test_evaluation,
     test_zero_return_test_evaluation,
     test_calculation_decision_numeric_fallback,
     test_result_builder_and_status_verdict,
@@ -42,6 +44,8 @@ if __name__ == "__main__":
     print(" [x] Rule Evaluator test passed")
     test_zero_setting_accuracy_test()
     print(" [x] Zero Setting Accuracy (TEST-A.4.2.3) test passed")
+    test_range_of_zero_setting_test()
+    print(" [x] Range of Zero-Setting (TEST-A.4.2.1) test passed")
     test_multi_row_array_iteration()
     print(" [x] Multi-Row Array Iteration test passed")
     test_tare_weighing_i_net_mapping()
@@ -49,7 +53,9 @@ if __name__ == "__main__":
     test_multi_set_repeatability_evaluation()
     print(" [x] Multi-Set Repeatability (TEST-A.4.10) Evaluation test passed")
     test_tilting_test_position_evaluation()
-    print(" [x] Tilting Test (TEST-A.4.11.1) Position Evaluation test passed")
+    print(" [x] Tilting Test (TEST-A.5.1) Position Evaluation test passed")
+    test_creep_test_evaluation()
+    print(" [x] Creep Test (TEST-A.4.11.1) Evaluation test passed")
     test_zero_return_test_evaluation()
     print(" [x] Zero Return Test (TEST-A.4.11.2) Evaluation test passed")
     test_calculation_decision_numeric_fallback()
@@ -64,4 +70,4 @@ if __name__ == "__main__":
     print(" [x] Endurance Test (TEST-A.6) Evaluation test passed")
     test_laboratory_code_settings_and_models()
     print(" [x] Laboratory Code & Settings API test passed")
-    print("\nSUCCESS: All 18 Rule Engine & Settings tests passed cleanly!")
+    print("\nSUCCESS: All 19 Rule Engine & Settings tests passed cleanly!")

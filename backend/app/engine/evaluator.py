@@ -199,7 +199,31 @@ class RuleEvaluator:
         calc_rules = test_def.get("calculations", [])
         current_obs = dict(observations)
 
-        if test_id in ("TEST-A.4.11.2", "zero_return_test") or "zero_deviation" in observations:
+        if test_id in ("TEST-A.4.2.1", "zero_setting_test"):
+            res_list = self.calculator.calculate_rule(
+                rule_id="CALC_ZERO_SETTING_RANGE",
+                observations=observations,
+                context=context,
+                mpe_result=primary_mpe
+            )
+            calculations.extend(res_list)
+        elif test_id in ("TEST-A.4.11.1", "creep_test"):
+            res_list = self.calculator.calculate_rule(
+                rule_id="CALC_CREEP_TEST",
+                observations=observations,
+                context=context,
+                mpe_result=primary_mpe
+            )
+            calculations.extend(res_list)
+        elif test_id in ("TEST-A.5.1", "tilting_test") or any(k in observations for k in ("positions", "tilt_positions")):
+            res_list = self.calculator.calculate_rule(
+                rule_id="CALC_TILTING_TEST",
+                observations=observations,
+                context=context,
+                mpe_result=primary_mpe
+            )
+            calculations.extend(res_list)
+        elif test_id in ("TEST-A.4.11.2", "zero_return_test") or "zero_deviation" in observations:
             res_list = self.calculator.calculate_rule(
                 rule_id="CALC_ZERO_RETURN",
                 observations=observations,
@@ -261,7 +285,15 @@ class RuleEvaluator:
 
         # Handle custom repeatability, tilting, stability, voltage variations, endurance, or eccentricity inline calculation if calc rules array is empty
         if not calculations:
-            if test_id in ("TEST-A.4.11.1", "TEST-A.5.1", "tilting_test") or any(k in observations for k in ("positions", "tilt_positions")):
+            if test_id in ("TEST-A.4.11.1", "creep_test"):
+                res_list = self.calculator.calculate_rule(
+                    rule_id="CALC_CREEP_TEST",
+                    observations=observations,
+                    context=context,
+                    mpe_result=primary_mpe
+                )
+                calculations.extend(res_list)
+            elif test_id in ("TEST-A.5.1", "tilting_test") or any(k in observations for k in ("positions", "tilt_positions")):
                 res_list = self.calculator.calculate_rule(
                     rule_id="CALC_TILTING_TEST",
                     observations=observations,
@@ -383,12 +415,15 @@ class RuleEvaluator:
             # Ensure consistency between row-level passes and test-level execution status:
             # If all individual calculations or steps in a test have decision == "PASS" (or no calculation has decision == "FAIL"),
             # the final TestExecutionStatus is set to PASS.
-            if not calc_fails:
+            if not calc_fails and explicit_passes:
                 final_status = TestExecutionStatus.PASS
                 summary = "All calculation requirements passed successfully."
-            else:
+            elif calc_fails:
                 final_status = TestExecutionStatus.FAIL
                 summary = f"Calculation failed requirement: {calc_fails[0].name}"
+            else:
+                final_status = TestExecutionStatus.MANUAL_REVIEW
+                summary = "Source measurement unavailable — enter laboratory measurement."
         elif manual_result:
             if manual_result.upper() == "PASS":
                 final_status = TestExecutionStatus.PASS

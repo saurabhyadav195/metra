@@ -96,7 +96,7 @@ export function TiltingTestForm({
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground font-mono">OIML R 76-1 §A.4.11.1 — Tilting Test Observations</h4>
+          <h4 className="text-xs font-semibold text-foreground font-mono">OIML R 76-1 §A.5.1 — Tilting Test Observations</h4>
           <p className="text-[11px] text-muted-foreground">
             Record indication at level and at maximum permitted out-of-level positions
           </p>

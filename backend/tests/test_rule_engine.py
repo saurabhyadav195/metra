@@ -242,6 +242,83 @@ def test_zero_setting_accuracy_test():
     assert calc_fail_dL.decision == "FAIL"
 
 
+def test_range_of_zero_setting_test():
+    """
+    Focused test for TEST-A.4.2.1 — Range of zero-setting (OIML R 76-1 §A.4.2.1 & §4.5.1).
+    Verifies:
+      1. Empty observations return INCOMPLETE / IN_PROGRESS with 'Source measurement unavailable' (NO fake PASS).
+      2. Valid initial zero-setting observations (<= 20% Max) pass.
+      3. Valid semi-automatic zero-setting observations (> 4% Max limit) fail.
+      4. Non-removable negative portion handling (negative_applicable = False).
+    """
+    evaluator = RuleEvaluator()
+    ctx = EvaluationContext(
+        instrument_id="inst_zero_range",
+        max_capacity=15.0,
+        e_resolution=0.005,
+        d_resolution=0.005,
+        accuracy_class="III",
+        unit="kg"
+    )
+
+    test_id = "TEST-A.4.2.1"
+
+    # --- 1. Empty / unavailable range measurements ---
+    obs_empty = {"zero_setting_type": "initial"}
+    res_empty = evaluator.evaluate_test(test_id, ctx, obs_empty)
+    assert res_empty.status != TestExecutionStatus.PASS
+    assert "Source measurement unavailable" in res_empty.summary_message
+
+    # Test directly via calculation engine for extract_zero_setting_range
+    from app.engine.calculator import extract_zero_setting_range
+    info_empty = extract_zero_setting_range(obs_empty, ctx)
+    assert info_empty["status"] == "INCOMPLETE"
+    assert "Source measurement unavailable" in info_empty["message"]
+
+    # --- 2. Valid Passing Initial Zero-setting (Pos=0.55kg, Neg=0.15kg -> Total=0.70kg <= 3.0kg [20% of 15kg]) ---
+    obs_pass = {
+        "zero_setting_type": "initial",
+        "negative_applicable": True,
+        "positive_range_kg": 0.55,
+        "negative_range_kg": 0.15
+    }
+    info_pass = extract_zero_setting_range(obs_pass, ctx)
+    assert info_pass["status"] == "PASS"
+    assert info_pass["total_range_kg"] == 0.70
+    assert info_pass["max_allowed_kg"] == 3.0
+    assert info_pass["zero_setting_type"] == "initial"
+
+    res_pass = evaluator.evaluate_test(test_id, ctx, obs_pass)
+    assert res_pass.status == TestExecutionStatus.PASS
+
+    # --- 3. Valid Failing Semi-automatic Zero-setting (Limit 4% of 15kg = 0.60kg; Pos=0.55kg, Neg=0.15kg -> Total=0.70kg > 0.60kg) ---
+    obs_fail = {
+        "zero_setting_type": "semi_automatic",
+        "negative_applicable": True,
+        "positive_range_kg": 0.55,
+        "negative_range_kg": 0.15
+    }
+    info_fail = extract_zero_setting_range(obs_fail, ctx)
+    assert info_fail["status"] == "FAIL"
+    assert info_fail["total_range_kg"] == 0.70
+    assert info_fail["max_allowed_kg"] == 0.6
+
+    res_fail = evaluator.evaluate_test(test_id, ctx, obs_fail)
+    assert res_fail.status == TestExecutionStatus.FAIL
+
+    # --- 4. Non-removable load receptor (negative_applicable = False) ---
+    obs_non_removable = {
+        "zero_setting_type": "non_automatic",
+        "negative_applicable": False,
+        "positive_range_kg": 0.45
+    }
+    info_non_rem = extract_zero_setting_range(obs_non_removable, ctx)
+    assert info_non_rem["status"] == "PASS"
+    assert info_non_rem["total_range_kg"] == 0.45
+    assert info_non_rem["negative_range_kg"] is None
+    assert info_non_rem["negative_applicable"] is False
+
+
 def test_multi_row_array_iteration():
     """
     Verifies architectural fixes:
@@ -404,7 +481,7 @@ def test_multi_set_repeatability_evaluation():
 
 def test_tilting_test_position_evaluation():
     """
-    Verifies Tilting Test (TEST-A.4.11.1 / OIML R 76-1 §A.5.1):
+    Verifies Tilting Test (TEST-A.5.1 / OIML R 76-1 §A.5.1):
     1. Position-wise iteration over positions array with tilt_angle, L, I, dL.
     2. Unrounded indication P_v = I + 0.5*e - dL and zero-corrected indication P_v_0 = P_v - E0.
     3. Compliance decision against MPEEngine limits.
@@ -423,6 +500,7 @@ def test_tilting_test_position_evaluation():
     )
 
     tilt_obs = {
+        "limiting_tilt_value": "50/1000",
         "E0": 0.0,
         "positions": [
             {
@@ -450,7 +528,7 @@ def test_tilting_test_position_evaluation():
     }
 
     # 1. Test RuleEvaluator with Tilting test observations
-    res = evaluator.evaluate_test("TEST-A.4.11.1", ctx, tilt_obs)
+    res = evaluator.evaluate_test("TEST-A.5.1", ctx, tilt_obs)
     assert res.status == TestExecutionStatus.PASS, f"Expected PASS, got {res.status}: {res.summary_message}"
     assert len(res.calculations) == 3, f"Expected 3 position calculations, got {len(res.calculations)}"
 
@@ -478,6 +556,70 @@ def test_tilting_test_position_evaluation():
     assert positions_out[0]["result"] == "PASS"
     assert positions_out[1]["result"] == "PASS"
     assert positions_out[2]["result"] == "PASS"
+
+
+def test_creep_test_evaluation():
+    """
+    Verifies Creep Test (TEST-A.4.11.1 / OIML R 76-1 §A.4.11.1 & §3.9.4.1):
+    1. Evaluates timed indication observations under constant load close to Max.
+    2. Calculates delta_P(0->30m) <= 0.5 e and delta_P(15->30m) <= 0.2 e.
+    3. Handles NMI P108 worked-example observations cleanly.
+    4. Confirms payload does NOT contain tilt fields (positions[], tilt_angle, A.5.1 rule IDs).
+    5. Confirms unsupplied E0 is NOT defaulted to 0.
+    """
+    from app.services.evaluation_service import EvaluationService
+
+    evaluator = RuleEvaluator()
+    ctx = EvaluationContext(
+        instrument_id="inst_creep",
+        max_capacity=15.0,
+        e_resolution=0.005,
+        d_resolution=0.001,
+        accuracy_class="III",
+        unit="kg"
+    )
+
+    # NMI P108 Worked-Example Data
+    creep_obs_nmi = {
+        "load": 15.000,
+        "readings": [
+            {"time_min": 0, "I": 15.000, "dL": 0.0035},   # P_0m = 15.000 + 0.0025 - 0.0035 = 14.9990
+            {"time_min": 5, "I": 15.000, "dL": 0.0030},   # P_5m = 15.000 + 0.0025 - 0.0030 = 14.9995
+            {"time_min": 15, "I": 15.000, "dL": 0.0025},  # P_15m = 15.000 + 0.0025 - 0.0025 = 15.0000
+            {"time_min": 30, "I": 15.000, "dL": 0.0025}   # P_30m = 15.000 + 0.0025 - 0.0025 = 15.0000
+        ]
+    }
+
+    # 1. RuleEvaluator test
+    res = evaluator.evaluate_test("TEST-A.4.11.1", ctx, creep_obs_nmi)
+    assert len(res.calculations) >= 2, f"Expected at least 2 creep calculations, got {len(res.calculations)}"
+    
+    calc_0_30 = next(c for c in res.calculations if c.calculation_id == "CALC_CREEP_0_30")
+    calc_15_30 = next(c for c in res.calculations if c.calculation_id == "CALC_CREEP_15_30")
+
+    # delta_P(0->30m) = |15.0000 - 14.9990| = 0.0010 <= 0.5 * 0.005 (0.0025) -> PASS
+    assert abs(calc_0_30.output - 0.0010) < 1e-6
+    assert calc_0_30.decision == "PASS"
+
+    # delta_P(15->30m) = |15.0000 - 15.0000| = 0.0000 <= 0.2 * 0.005 (0.0010) -> PASS
+    assert abs(calc_15_30.output - 0.0000) < 1e-6
+    assert calc_15_30.decision == "PASS"
+
+    # Verify no tilt references exist in calculation inputs or source
+    for calc in res.calculations:
+        assert "positions" not in calc.inputs
+        assert "tilt_angle" not in calc.inputs
+        assert "A.5.1" not in str(calc.source)
+
+    # 2. EvaluationService test without E0
+    svc = EvaluationService(client=None)
+    spec_res = svc._calculate_creep_test(ctx, creep_obs_nmi, {})
+    assert spec_res["status"] == "PASS"
+    assert "positions" not in spec_res
+    assert "E0" not in spec_res, "Unsupplied E0 should not be present in spec_res"
+    assert spec_res["delta_P_0_30"] == 0.0010
+    assert spec_res["delta_P_15_30"] == 0.0000
+    assert len(spec_res["readings"]) == 4
 
 
 def test_zero_return_test_evaluation():
