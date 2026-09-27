@@ -189,29 +189,16 @@ export function VoltageVariationTestForm({
     onObservationsChange({ reference, low, high });
   }, [reference, low, high]);
 
-  const handleDemo = () => {
-    setReference({ voltage: 230, frequency: 50, time: "08:00", readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setLow({ voltage: 195, frequency: 50, time: "09:00", readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.001 })) });
-    setHigh({ voltage: 265, frequency: 50, time: "10:00", readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I - 0.001 })) });
-  };
-
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Voltage Variation — 3-Stage Power Supply Protocol</h4>
+          <h4 className="text-xs font-semibold text-foreground font-mono">OIML R 76-1 §A.5.4 — Voltage Variation Observations</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.5.4 — Reference voltage → Low voltage → High voltage weighing comparison
+            Reference voltage → Low voltage → High voltage weighing comparison
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Load Sample
-        </Button>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">Representative demonstration data — not a certified laboratory measurement.</p>
 
       <VoltageStagePanel label="Stage 1 — Reference Voltage (230 V / 50 Hz)"
         colorClass="border-emerald-500/30 bg-emerald-500/5"

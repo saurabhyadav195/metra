@@ -10,7 +10,7 @@
 
 import { useState, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AddSquareIcon, Delete02Icon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { AddSquareIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -161,28 +161,14 @@ export function EnduranceTestForm({
     onObservationsChange({ initial, final });
   }, [initial, final]);
 
-  const handleDemo = () => {
-    setInitial({ cycle_count: 0, readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setFinal({ cycle_count: 10000, readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.002 })) });
-  };
-
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div>
-          <h4 className="text-xs font-semibold text-foreground">Endurance Test — Initial vs Final Reference</h4>
-          <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.4.9 — Record reference weighing before and after endurance cycling
-          </p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Load Sample
-        </Button>
+      <div className="border-b border-border pb-3">
+        <h4 className="text-xs font-semibold text-foreground">Endurance Test — Initial vs Final Reference</h4>
+        <p className="text-[11px] text-muted-foreground">
+          OIML R 76-1 §A.4.9 — Record reference weighing before and after endurance cycling
+        </p>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">Representative demonstration data — not a certified laboratory measurement.</p>
 
       <EnduranceStagePanel label="Initial Reference (Before Endurance Cycles)"
         colorClass="border-blue-500/30 bg-blue-500/5"

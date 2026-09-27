@@ -11,7 +11,7 @@
 
 import { useState, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AddSquareIcon, Delete02Icon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { AddSquareIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -138,7 +138,6 @@ function EMCStagePanel({
 }
 
 export function EMCElectricalTestForm({
-  testName,
   observations,
   onObservationsChange,
   disabled = false,
@@ -170,28 +169,13 @@ export function EMCElectricalTestForm({
     });
   }, [disturbanceType, disturbanceLevel, preRef, during, postRef]);
 
-  const handleDemo = () => {
-    setDisturbanceType("Electrostatic Discharge");
-    setDisturbanceLevel("4 kV contact / 8 kV air");
-    setPreRef(parseEMCStage(null, "Pre-Disturbance Reference"));
-    setDuring(parseEMCStage(null, "During Disturbance"));
-    setPostRef(parseEMCStage(null, "Post-Disturbance Recovery"));
-  };
-
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div>
-          <h4 className="text-xs font-semibold text-foreground">EMC / Electrical Influence — {testName}</h4>
-          <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 Annex B/C — Pre-disturbance reference → Apply disturbance → Post-disturbance recovery
-          </p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Load Sample
-        </Button>
+      <div className="border-b border-border pb-3">
+        <h4 className="text-xs font-semibold text-foreground">EMC / Electrical Influence Observations</h4>
+        <p className="text-[11px] text-muted-foreground">
+          OIML R 76-1 Annex B/C — Pre-disturbance reference → Apply disturbance → Post-disturbance recovery
+        </p>
       </div>
 
       {/* Disturbance metadata */}
@@ -209,8 +193,6 @@ export function EMCElectricalTestForm({
             disabled={disabled} className="h-8 text-xs" placeholder="e.g. 4 kV contact, Level 3" />
         </div>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">Representative demonstration data — not a certified laboratory measurement.</p>
 
       <EMCStagePanel colorClass="border-emerald-500/30 bg-emerald-500/5"
         stage={preRef} onChange={setPreRef} disabled={disabled} />

@@ -25,7 +25,6 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { MetricCard, MetricGrid } from "@/components/common/MetricCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { SectionCard } from "@/components/common/SectionCard";
-import { QuickActions } from "@/components/common/QuickActions";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { getDashboardStats } from "@/services/api/dashboard";
@@ -105,83 +104,75 @@ export default function OwnerDashboard() {
               />
             </MetricGrid>
 
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <SectionCard
-                  title="Laboratory Operations Summary"
-                  description="Recent test evaluations across the laboratory"
-                  action={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate("/app/evaluations")}
-                      className="text-xs gap-1"
-                    >
-                      View all
-                      <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
-                    </Button>
-                  }
-                >
-                  {!stats?.recent_evaluations.length ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                      No evaluation history available for this laboratory yet.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-border bg-muted/70 text-foreground font-medium">
-                            <th className="py-2.5 px-3">Evaluation ID</th>
-                            <th className="py-2.5 px-3">Instrument</th>
-                            <th className="py-2.5 px-3">Serial No</th>
-                            <th className="py-2.5 px-3">Status</th>
-                            <th className="py-2.5 px-3 text-right">Action</th>
+            {/* Main Content Area — Full Width Operations Summary */}
+            <div className="w-full">
+              <SectionCard
+                title="Laboratory Operations Summary"
+                description="Recent test evaluations across the laboratory"
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate("/app/evaluations")}
+                    className="text-xs gap-1"
+                  >
+                    View all
+                    <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
+                  </Button>
+                }
+              >
+                {!stats?.recent_evaluations.length ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    No evaluation history available for this laboratory yet.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/70 text-foreground font-medium">
+                          <th className="py-2.5 px-3 w-[20%]">Evaluation ID</th>
+                          <th className="py-2.5 px-3 w-[22%]">Instrument</th>
+                          <th className="py-2.5 px-3 w-[18%]">Serial No</th>
+                          <th className="py-2.5 px-3 w-[15%]">Type</th>
+                          <th className="py-2.5 px-3 w-[15%]">Status</th>
+                          <th className="py-2.5 px-3 w-[10%] text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {stats.recent_evaluations.map((item) => (
+                          <tr key={item.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="py-2.5 px-3 font-mono font-medium text-foreground">
+                              {item.evaluation_number}
+                            </td>
+                            <td className="py-2.5 px-3 text-foreground font-medium">
+                              {item.instrument_model}
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground font-mono">
+                              {item.serial_number}
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground font-mono text-[11px] uppercase">
+                              {item.instrument_type || "NAWI"}
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <StatusBadge status={item.status as EvaluationStatus} />
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 text-xs px-2"
+                                onClick={() => navigate(`/app/evaluations/${item.id}`)}
+                              >
+                                View
+                              </Button>
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {stats.recent_evaluations.map((item) => (
-                            <tr key={item.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="py-2.5 px-3 font-mono font-medium text-foreground">
-                                {item.evaluation_number}
-                              </td>
-                              <td className="py-2.5 px-3 text-foreground font-medium">
-                                {item.instrument_model}
-                              </td>
-                              <td className="py-2.5 px-3 text-muted-foreground font-mono">
-                                {item.serial_number}
-                              </td>
-                              <td className="py-2.5 px-3">
-                                <StatusBadge status={item.status as EvaluationStatus} />
-                              </td>
-                              <td className="py-2.5 px-3 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs px-2"
-                                  onClick={() => navigate(`/app/evaluations/${item.id}`)}
-                                >
-                                  View
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </SectionCard>
-              </div>
-
-              <div>
-                <QuickActions
-                  title="Laboratory Control Panel"
-                  items={[
-                    { icon: Settings01Icon,  label: "Laboratory Settings",   href: "/app/settings",    iconColor: "text-primary" },
-                    { icon: UserGroupIcon,   label: "Personnel Management",  href: "/app/team",        iconColor: "text-success" },
-                    { icon: FileTextIcon,    label: "Technical Reports",     href: "/app/reports",     iconColor: "text-info" },
-                  ]}
-                />
-              </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </SectionCard>
             </div>
           </>
         )}

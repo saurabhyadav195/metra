@@ -82,30 +82,16 @@ export function EccentricityTestForm({
     setPositions(updated);
   };
 
-  const handleLoadDemoData = () => {
-    setE0(0.0);
-    setPositions(DEFAULT_POSITIONS);
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Eccentricity Test — Load Position Observations</h4>
+          <h4 className="text-xs font-semibold text-foreground font-mono">OIML R 76-1 §A.4.7 — Eccentricity Loading Observations</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.4.7 — Apply ~1/3 (Max + T⁺) at center & 4 quarter segments
+            Apply ~1/3 (Max + T⁺) at center & 4 quarter segments
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleLoadDemoData} disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Load Sample
-        </Button>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">
-        Representative demonstration data — not a certified laboratory measurement.
-      </p>
 
       {/* E0 Header field */}
       <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-1.5 max-w-xs">

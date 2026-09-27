@@ -24,7 +24,6 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { MetricCard, MetricGrid } from "@/components/common/MetricCard";
 import { StatusBadge } from "@/components/common/StatusBadge";
 import { SectionCard } from "@/components/common/SectionCard";
-import { QuickActions } from "@/components/common/QuickActions";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { getDashboardStats } from "@/services/api/dashboard";
@@ -104,83 +103,68 @@ export default function AdminDashboard() {
               />
             </MetricGrid>
 
-            <div className="grid gap-6 lg:grid-cols-3">
-              <div className="lg:col-span-2">
-                <SectionCard
-                  title="Laboratory Evaluations Overview"
-                  description="Recent evaluations across all engineers"
-                  action={
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => navigate("/app/evaluations")}
-                      className="text-xs gap-1"
-                    >
-                      View all
-                      <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
-                    </Button>
-                  }
-                >
-                  {!stats?.recent_evaluations.length ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                      No evaluations registered in this laboratory yet.
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="border-b border-border bg-muted/70 text-foreground font-medium">
-                            <th className="py-2.5 px-3">Evaluation ID</th>
-                            <th className="py-2.5 px-3">Instrument</th>
-                            <th className="py-2.5 px-3">Manufacturer</th>
-                            <th className="py-2.5 px-3">Status</th>
-                            <th className="py-2.5 px-3 text-right">Action</th>
+            {/* Main Content Area — Full Width Laboratory Evaluations */}
+            <div className="w-full">
+              <SectionCard
+                title="Laboratory Evaluations Overview"
+                description="Recent evaluations across all engineers"
+                action={
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate("/app/evaluations")}
+                    className="text-xs gap-1"
+                  >
+                    View all
+                    <HugeiconsIcon icon={ArrowRight01Icon} strokeWidth={2} className="size-3.5" />
+                  </Button>
+                }
+              >
+                {!stats?.recent_evaluations.length ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    No evaluations registered in this laboratory yet.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="border-b border-border bg-muted/70 text-foreground font-medium">
+                          <th className="py-2.5 px-3 w-[18%]">Evaluation ID</th>
+                          <th className="py-2.5 px-3 w-[20%]">Instrument</th>
+                          <th className="py-2.5 px-3 w-[18%]">Serial No</th>
+                          <th className="py-2.5 px-3 w-[14%]">Type</th>
+                          <th className="py-2.5 px-3 w-[18%]">Manufacturer</th>
+                          <th className="py-2.5 px-3 w-[12%] text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {stats.recent_evaluations.map((item) => (
+                          <tr key={item.id} className="hover:bg-muted/20 transition-colors">
+                            <td className="py-2.5 px-3 font-mono font-medium text-foreground">
+                              {item.evaluation_number}
+                            </td>
+                            <td className="py-2.5 px-3 text-foreground font-medium">
+                              {item.instrument_model}
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground font-mono">
+                              {item.serial_number}
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground font-mono text-[11px] uppercase">
+                              {item.instrument_type || "NAWI"}
+                            </td>
+                            <td className="py-2.5 px-3 text-muted-foreground">
+                              {item.instrument_manufacturer}
+                            </td>
+                            <td className="py-2.5 px-3 text-right">
+                              <StatusBadge status={item.status as EvaluationStatus} />
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-border">
-                          {stats.recent_evaluations.map((item) => (
-                            <tr key={item.id} className="hover:bg-muted/20 transition-colors">
-                              <td className="py-2.5 px-3 font-mono font-medium text-foreground">
-                                {item.evaluation_number}
-                              </td>
-                              <td className="py-2.5 px-3 text-foreground font-medium">
-                                {item.instrument_model}
-                              </td>
-                              <td className="py-2.5 px-3 text-muted-foreground">
-                                {item.instrument_manufacturer}
-                              </td>
-                              <td className="py-2.5 px-3">
-                                <StatusBadge status={item.status as EvaluationStatus} />
-                              </td>
-                              <td className="py-2.5 px-3 text-right">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 text-xs px-2"
-                                  onClick={() => navigate(`/app/evaluations/${item.id}`)}
-                                >
-                                  Review
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </SectionCard>
-              </div>
-
-              <div>
-                <QuickActions
-                  title="Quick Management"
-                  items={[
-                    { icon: ScaleIcon,          label: "Manage Instruments", href: "/app/instruments", iconColor: "text-primary" },
-                    { icon: UserGroupIcon,       label: "Manage Team",        href: "/app/team",        iconColor: "text-success" },
-                    { icon: FileTextIcon,        label: "View Reports",       href: "/app/reports",     iconColor: "text-info" },
-                  ]}
-                />
-              </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </SectionCard>
             </div>
           </>
         )}

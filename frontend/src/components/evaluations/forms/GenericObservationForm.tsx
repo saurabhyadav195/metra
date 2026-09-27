@@ -4,9 +4,6 @@
  */
 
 import { useState, useEffect } from "react";
-import { HugeiconsIcon } from "@hugeicons/react";
-import { SparklesIcon } from "@hugeicons/core-free-icons";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,7 +17,6 @@ export interface GenericObservationFormProps {
 }
 
 export function GenericObservationForm({
-  testName,
   observations,
   onObservationsChange,
   disabled = false,
@@ -43,38 +39,14 @@ export function GenericObservationForm({
     });
   }, [observedValue, notes, manualResult]);
 
-  const handleLoadDemoData = () => {
-    setObservedValue("0.0");
-    setNotes("Executed in accordance with verified OIML R 76-1 procedure summary.");
-    setManualResult("PASS");
-  };
-
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div>
-          <h4 className="text-xs font-semibold text-foreground">Observation Entry: {testName}</h4>
-          <p className="text-[11px] text-muted-foreground">
-            Standard laboratory observation recorder
-          </p>
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={handleLoadDemoData}
-          disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10"
-        >
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Load Sample Observations
-        </Button>
+      <div className="border-b border-border pb-3">
+        <h4 className="text-xs font-semibold text-foreground">Test Observations</h4>
+        <p className="text-[11px] text-muted-foreground">
+          Standard laboratory observation recorder
+        </p>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">
-        Representative demonstration data — not a certified laboratory measurement.
-      </p>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="rounded-md border border-border bg-muted/20 p-3 space-y-1.5">

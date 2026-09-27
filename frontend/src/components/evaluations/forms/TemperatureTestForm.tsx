@@ -177,29 +177,16 @@ export function TemperatureTestForm({
     onObservationsChange({ low, reference, high });
   }, [low, reference, high]);
 
-  const handleDemo = () => {
-    setLow({ temperature: -10, time: "08:00", readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setReference({ temperature: 20, time: "12:00", readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setHigh({ temperature: 40, time: "16:00", readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.001 })) });
-  };
-
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Temperature Influence — 3-Stage Protocol</h4>
+          <h4 className="text-xs font-semibold text-foreground font-mono">OIML R 76-1 §A.5.3 — Temperature Test Observations</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.5.3 — Low temperature → Reference temperature → High temperature weighing comparison
+            Low temperature → Reference temperature → High temperature weighing comparison
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Load Sample
-        </Button>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">Representative demonstration data — not a certified laboratory measurement.</p>
 
       <TempStagePanel label="Stage 1 — Low Temperature"
         colorClass="border-blue-500/30 bg-blue-500/5"

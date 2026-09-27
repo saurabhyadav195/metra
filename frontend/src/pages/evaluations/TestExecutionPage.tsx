@@ -511,7 +511,7 @@ export default function TestExecutionPage() {
                    screen after the first crash)
         */}
         <SectionCard
-          title={`Test Observations & Inputs — ${rawTestName}`}
+          title="Test Observations & Inputs"
           description={`Verified OIML clause ${clause} laboratory measurement fields`}
         >
           <ErrorBoundary key={testId}>
@@ -525,13 +525,13 @@ export default function TestExecutionPage() {
           </ErrorBoundary>
         </SectionCard>
 
-        {/* Engine Calculation & Rule Trace Output */}
+        {/* Calculation & Compliance Results Section */}
         {calcResult && (
-          <SectionCard title="Backend OIML Rule Engine Output & Trace">
+          <SectionCard title="Calculation Results">
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <div>
-                  <p className="text-xs font-medium text-muted-foreground">Deterministic Compliance Decision</p>
+                  <p className="text-xs font-medium text-muted-foreground">Compliance Decision</p>
                   <p className="text-sm font-bold text-foreground mt-0.5">
                     {(calcResult as any).summary_message || (calcResult as any).status || "Evaluation Completed"}
                   </p>
@@ -543,7 +543,7 @@ export default function TestExecutionPage() {
               {calcRows.length > 0 ? (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
-                    Calculated Rows & Compliance Limits
+                    Calculated Observations & MPE Evaluation
                   </p>
                   <div className="overflow-x-auto rounded border border-border">
                     <table className="w-full text-left text-xs font-mono">
@@ -596,19 +596,22 @@ export default function TestExecutionPage() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded border border-border bg-muted/20 p-3 space-y-2 font-mono text-xs">
-                  <pre className="whitespace-pre-wrap break-all text-[11px] text-foreground">
+                <details className="rounded border border-border bg-muted/20 p-3 space-y-2 font-mono text-xs">
+                  <summary className="cursor-pointer font-medium text-muted-foreground text-xs hover:text-foreground">
+                    View Calculation Details
+                  </summary>
+                  <pre className="whitespace-pre-wrap break-all text-[11px] text-foreground mt-2">
                     {JSON.stringify(calcObj, null, 2)}
                   </pre>
-                </div>
+                </details>
               )}
 
-              {/* Rule References & Trace */}
+              {/* Rule References & Applicable Standards */}
               {ruleRefs.length > 0 && (
                 <div className="space-y-2 pt-2 border-t border-border">
                   <p className="text-xs font-semibold text-foreground uppercase tracking-wide flex items-center gap-1.5">
                     <HugeiconsIcon icon={ShieldCheckIcon} strokeWidth={2} className="size-3.5 text-primary" />
-                    Verified OIML Rule Trace
+                    Applicable Rules & Standards
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {ruleRefs.map((ref: any, idx: number) => {

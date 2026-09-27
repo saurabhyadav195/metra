@@ -13,7 +13,7 @@
 
 import { useState, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AddSquareIcon, Delete02Icon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { AddSquareIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -197,29 +197,14 @@ export function DampHeatTestForm({
     onObservationsChange({ initial, damp_heat: dampHeat, final });
   }, [initial, dampHeat, final]);
 
-  const handleDemo = () => {
-    setInitial({ time: "08:00", temperature: 23, humidity: 50, readings: DEMO_READINGS.map((r) => ({ ...r })) });
-    setDampHeat({ time: "16:00", temperature: 40, humidity: 93, readings: DEMO_READINGS.map((r) => ({ ...r, I: r.I + 0.001 })) });
-    setFinal({ time: "24:00", temperature: 23, humidity: 50, readings: DEMO_READINGS.map((r) => ({ ...r })) });
-  };
-
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
-        <div>
-          <h4 className="text-xs font-semibold text-foreground">Damp Heat, Steady State — 3-Stage Weighing Protocol</h4>
-          <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §B.2.2 — Initial reference → Damp heat conditioning → Final reference comparison
-          </p>
-        </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Load Sample
-        </Button>
+      <div className="border-b border-border pb-3">
+        <h4 className="text-xs font-semibold text-foreground">Damp Heat, Steady State — 3-Stage Weighing Protocol</h4>
+        <p className="text-[11px] text-muted-foreground">
+          OIML R 76-1 §B.2.2 — Initial reference → Damp heat conditioning → Final reference comparison
+        </p>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">Representative demonstration data — not a certified laboratory measurement.</p>
 
       <WeighingGridPanel label="Stage 1 — Initial Reference (Normal Conditions)"
         colorClass="border-blue-500/30 bg-blue-500/5"

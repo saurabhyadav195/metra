@@ -85,23 +85,16 @@ export function WeighingTestForm({
     setRows(rows.filter((_, i) => i !== idx));
   };
 
-  const handleLoadDemoData = () => setRows(DEMO_READINGS);
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Weighing Test — Load Step Observations</h4>
+          <h4 className="text-xs font-semibold text-foreground font-mono">OIML R 76-1 §A.4.4 — Weighing Test Load Step Observations</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.4.4 — Record Indication (I) and Changeover Weight (ΔL) for each applied load (L)
+            Record Indication (I) and Changeover Weight (ΔL) for each applied load (L)
           </p>
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={handleLoadDemoData} disabled={disabled}
-            className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-            <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-            Load Sample
-          </Button>
           <Button type="button" variant="outline" size="sm" onClick={handleAddRow} disabled={disabled}
             className="h-7 text-xs gap-1">
             <HugeiconsIcon icon={AddSquareIcon} strokeWidth={2} className="size-3.5" />
@@ -109,10 +102,6 @@ export function WeighingTestForm({
           </Button>
         </div>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">
-        Representative demonstration data — not a certified laboratory measurement.
-      </p>
 
       <div className="overflow-x-auto rounded-md border border-border">
         <table className="w-full text-left text-xs">

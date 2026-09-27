@@ -32,3 +32,4 @@ dist-ssr
 graphify-out/
 .graphifyignore
 AGENTS.md
+DESIGN.md

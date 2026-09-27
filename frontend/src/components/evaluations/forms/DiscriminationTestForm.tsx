@@ -12,7 +12,7 @@
 
 import { useState, useEffect } from "react";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { AddSquareIcon, Delete02Icon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { AddSquareIcon, Delete02Icon } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -81,11 +81,6 @@ export function DiscriminationTestForm({
     setRows(rows.filter((_, i) => i !== idx));
   };
 
-  const handleDemo = () => {
-    setD(0.01);
-    setRows(DEFAULT_ROWS);
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
@@ -96,11 +91,6 @@ export function DiscriminationTestForm({
           </p>
         </div>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" size="sm" onClick={handleDemo} disabled={disabled}
-            className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-            <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-            Load Sample
-          </Button>
           <Button type="button" variant="outline" size="sm" onClick={handleAddRow} disabled={disabled}
             className="h-7 text-xs gap-1">
             <HugeiconsIcon icon={AddSquareIcon} strokeWidth={2} className="size-3.5" />
@@ -169,10 +159,6 @@ export function DiscriminationTestForm({
           </tbody>
         </table>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">
-        Representative demonstration data — not a certified laboratory measurement.
-      </p>
     </div>
   );
 }

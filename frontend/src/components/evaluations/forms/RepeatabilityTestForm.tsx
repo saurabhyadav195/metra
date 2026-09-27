@@ -199,30 +199,16 @@ export function RepeatabilityTestForm({
     });
   }, [set1, set2]);
 
-  const handleDemoData = () => {
-    setSet1(buildDefaultSet(50, 10));
-    setSet2(buildDefaultSet(100, 10));
-  };
-
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
         <div>
-          <h4 className="text-xs font-semibold text-foreground">Repeatability Test — Dual Load Sets</h4>
+          <h4 className="text-xs font-semibold text-foreground font-mono">OIML R 76-1 §A.4.10 — Repeatability Test Observations</h4>
           <p className="text-[11px] text-muted-foreground">
-            OIML R 76-1 §A.4.10 — Min 10 repeated weighings at ~50% Max and ~Max load
+            Min 10 repeated weighings at ~50% Max and ~Max load
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={handleDemoData} disabled={disabled}
-          className="h-7 text-xs gap-1 border-primary/30 text-primary hover:bg-primary/10">
-          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
-          Reset to Demo Data
-        </Button>
       </div>
-
-      <p className="text-[11px] text-muted-foreground italic">
-        Representative demonstration data — not a certified laboratory measurement.
-      </p>
 
       <RepeatabilitySetGrid
         label="Set 1 — Approximately 50% of Max Load"

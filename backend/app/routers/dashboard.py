@@ -64,7 +64,7 @@ async def get_dashboard_stats(
     # 2. Evaluations for caller's laboratory
     eval_res = (
         client.table("evaluations")
-        .select("*, instruments(model, manufacturer, serial_number)")
+        .select("*, instruments(model, manufacturer, serial_number, instrument_type)")
         .eq("laboratory_id", caller.laboratory_id)
         .order("created_at", desc=True)
         .execute()
@@ -104,6 +104,7 @@ async def get_dashboard_stats(
             "instrument_model": model_name,
             "instrument_manufacturer": inst.get("manufacturer", "Unknown"),
             "serial_number": inst.get("serial_number", ""),
+            "instrument_type": inst.get("instrument_type") or "NAWI",
             "status": ev.get("status", "DRAFT"),
             "overall_result": (ev.get("overall_result") or {}).get("result") if isinstance(ev.get("overall_result"), dict) else ev.get("overall_result"),
             "created_at": ev.get("created_at"),

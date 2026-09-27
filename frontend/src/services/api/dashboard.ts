@@ -19,6 +19,7 @@ export interface DashboardStats {
     instrument_model: string;
     instrument_manufacturer: string;
     serial_number: string;
+    instrument_type?: string;
     status: string;
     overall_result?: string;
     created_at: string;
