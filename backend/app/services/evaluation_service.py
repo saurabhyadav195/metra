@@ -618,6 +618,7 @@ class EvaluationService:
                 "test_load": load_val,
                 "active_e": active_e,
                 "readings": readings_f,
+                "trials": g.get("trials", []),
                 "I_max": round(I_max, 6),
                 "I_min": round(I_min, 6),
                 "range": round(range_val, 6),
@@ -641,6 +642,7 @@ class EvaluationService:
             "mpe_value": first_set.get("mpe_value"),
             "mpe_e": first_set.get("mpe_e"),
             "n_readings": first_set.get("n_readings"),
+            "zero_tracking": observations.get("zero_tracking", "in_operation"),
             "load_sets": sets_result,
             "rows": sets_result,
             "rule_references": [

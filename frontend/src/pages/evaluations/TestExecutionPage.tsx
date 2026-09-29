@@ -480,6 +480,13 @@ export default function TestExecutionPage() {
     (calcResult as any)?.total_range_pct !== undefined ||
     (calcObj as any)?.total_range_pct !== undefined;
 
+  const isRepeatabilityTest =
+    testId === "TEST-A.4.10" ||
+    testDetail?.test_id === "TEST-A.4.10" ||
+    (calcResult as any)?.test_id === "TEST-A.4.10" ||
+    (calcResult as any)?.load_sets !== undefined ||
+    (calcObj as any)?.load_sets !== undefined;
+
   const ruleRefs: any[] = Array.isArray((calcResult as any)?.rule_references) && (calcResult as any).rule_references.length > 0
     ? (calcResult as any).rule_references
     : Array.isArray(calcObj?.rule_references)
@@ -754,6 +761,99 @@ export default function TestExecutionPage() {
                       <span className="text-muted-foreground ml-2">| OIML R 76-1 §4.5.1 & §A.4.2.1</span>
                     </div>
                     <ResultBadge result={((calcObj?.status || (calcResult as any)?.status || "IN_PROGRESS") as any)} />
+                  </div>
+                </div>
+              ) : isRepeatabilityTest ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between border-b border-border pb-2">
+                    <p className="text-xs font-semibold text-foreground uppercase tracking-wide">
+                      OIML R 76-1 §A.4.10 — Repeatability Evaluation & Series Analysis
+                    </p>
+                    <ResultBadge result={((calcObj?.status || (calcResult as any)?.status || "PASS") as any)} />
+                  </div>
+
+                  {/* Load Sets Breakdown */}
+                  {((calcObj?.load_sets || (calcResult as any)?.load_sets || calcRows) as any[]).map((set: any, sIdx: number) => (
+                    <div key={sIdx} className="rounded-md border border-border bg-muted/20 p-3 space-y-2">
+                      <div className="flex items-center justify-between border-b border-border pb-1 text-xs font-mono">
+                        <span className="font-bold text-foreground">
+                          Set {set.set_index || sIdx + 1}: Test Load = {set.test_load} kg (n = {set.n_readings || set.readings?.length || 10})
+                        </span>
+                        <ResultBadge result={(set.result || set.status || "PASS") as any} />
+                      </div>
+
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                        <div className="bg-background/80 p-2 rounded border border-border/60">
+                          <span className="text-[10px] text-muted-foreground block">Max P (or I)</span>
+                          <span className="font-semibold text-foreground">{set.I_max} kg</span>
+                        </div>
+                        <div className="bg-background/80 p-2 rounded border border-border/60">
+                          <span className="text-[10px] text-muted-foreground block">Min P (or I)</span>
+                          <span className="font-semibold text-foreground">{set.I_min} kg</span>
+                        </div>
+                        <div className="bg-background/80 p-2 rounded border border-border/60">
+                          <span className="text-[10px] text-muted-foreground block">Range (Pmax − Pmin)</span>
+                          <span className={`font-bold ${set.result === "FAIL" ? "text-destructive" : "text-primary"}`}>
+                            {set.range} kg
+                          </span>
+                        </div>
+                        <div className="bg-background/80 p-2 rounded border border-border/60">
+                          <span className="text-[10px] text-muted-foreground block">MPE Limit</span>
+                          <span className="font-semibold text-foreground">±{set.mpe_value} kg ({set.mpe_e || 1}e)</span>
+                        </div>
+                      </div>
+
+                      {Array.isArray(set.trials) && set.trials.length > 0 && (
+                        <details className="text-[11px] font-mono pt-1">
+                          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                            View Observation Trials ({set.trials.length} readings)
+                          </summary>
+                          <div className="overflow-x-auto mt-2 rounded border border-border">
+                            <table className="w-full text-left border-collapse">
+                              <thead>
+                                <tr className="bg-muted/70 text-muted-foreground border-b border-border">
+                                  <th className="py-1 px-2 text-center">Trial #</th>
+                                  <th className="py-1 px-2">Indication I</th>
+                                  <th className="py-1 px-2">Changeover ΔL</th>
+                                  <th className="py-1 px-2">Calculated P</th>
+                                  <th className="py-1 px-2">Error E</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border/50">
+                                {set.trials.map((t: any, tIdx: number) => {
+                                  const P = t.P ?? t.I;
+                                  const E = P - set.test_load;
+                                  return (
+                                    <tr key={tIdx} className="hover:bg-muted/30">
+                                      <td className="py-1 px-2 text-center text-muted-foreground">{t.trial_index || tIdx + 1}</td>
+                                      <td className="py-1 px-2">{t.I} kg</td>
+                                      <td className="py-1 px-2 text-amber-600 dark:text-amber-400">{t.dL !== undefined ? `${t.dL} kg` : "—"}</td>
+                                      <td className="py-1 px-2 font-bold">{P} kg</td>
+                                      <td className="py-1 px-2 font-mono">{E >= 0 ? `+${E.toFixed(4)}` : E.toFixed(4)} kg</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </details>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Summary Footer Box */}
+                  <div className="rounded-md border border-border bg-muted/10 p-3 flex items-center justify-between text-xs font-mono">
+                    <div>
+                      <span className="font-semibold text-foreground">Rule ID: </span>
+                      <span className="text-primary font-bold">CALC_REPEATABILITY_RANGE</span>
+                      <span className="text-muted-foreground ml-2">| OIML R 76-1 §3.6.1 & §A.4.10</span>
+                      {calcObj?.zero_tracking && (
+                        <span className="ml-3 text-muted-foreground">
+                          (Zero Tracking: {String(calcObj.zero_tracking) === "in_operation" || calcObj.zero_tracking === true ? "In Operation" : "Disabled"})
+                        </span>
+                      )}
+                    </div>
+                    <ResultBadge result={((calcObj?.status || (calcResult as any)?.status || "PASS") as any)} />
                   </div>
                 </div>
               ) : calcRows.length > 0 ? (

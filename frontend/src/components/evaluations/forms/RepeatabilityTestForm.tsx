@@ -175,14 +175,18 @@ export function RepeatabilityTestForm({
   disabled = false,
 }: RepeatabilityTestFormProps) {
   const [set1, setSet1] = useState<RepeatabilitySet>(() =>
-    parseSet(observations?.set1, 50)
+    parseSet(observations?.set1, 7.5)
   );
   const [set2, setSet2] = useState<RepeatabilitySet>(() =>
-    parseSet(observations?.set2, 100)
+    parseSet(observations?.set2, 15.0)
+  );
+  const [zeroTracking, setZeroTracking] = useState<string>(
+    observations?.zero_tracking || "in_operation"
   );
 
   useEffect(() => {
     onObservationsChange({
+      zero_tracking: zeroTracking,
       set1: {
         load: set1.load,
         trials: set1.trials.map((t) => ({ I: t.indication, dL: t.dL })),
@@ -197,7 +201,41 @@ export function RepeatabilityTestForm({
         ...set2.trials.map((t) => ({ load: set2.load, I: t.indication, dL: t.dL })),
       ],
     });
-  }, [set1, set2]);
+  }, [set1, set2, zeroTracking]);
+
+  const loadNmiWorkedExample = () => {
+    setSet1({
+      load: 7.5,
+      trials: [
+        { indication: 7.500, dL: 0.0025 },
+        { indication: 7.500, dL: 0.0025 },
+        { indication: 7.500, dL: 0.0025 },
+        { indication: 7.500, dL: 0.0030 },
+        { indication: 7.500, dL: 0.0025 },
+        { indication: 7.500, dL: 0.0025 },
+        { indication: 7.500, dL: 0.0025 },
+        { indication: 7.500, dL: 0.0030 },
+        { indication: 7.500, dL: 0.0025 },
+        { indication: 7.500, dL: 0.0025 },
+      ],
+    });
+    setSet2({
+      load: 15.0,
+      trials: [
+        { indication: 15.000, dL: 0.0030 },
+        { indication: 15.000, dL: 0.0030 },
+        { indication: 15.000, dL: 0.0030 },
+        { indication: 15.000, dL: 0.0030 },
+        { indication: 15.000, dL: 0.0030 },
+        { indication: 15.000, dL: 0.0035 },
+        { indication: 15.000, dL: 0.0030 },
+        { indication: 15.000, dL: 0.0030 },
+        { indication: 15.000, dL: 0.0035 },
+        { indication: 15.000, dL: 0.0030 },
+      ],
+    });
+    setZeroTracking("in_operation");
+  };
 
   return (
     <div className="space-y-5">
@@ -207,6 +245,36 @@ export function RepeatabilityTestForm({
           <p className="text-[11px] text-muted-foreground">
             Min 10 repeated weighings at ~50% Max and ~Max load
           </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={loadNmiWorkedExample}
+          disabled={disabled}
+          className="h-7 text-xs gap-1.5 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-500/10"
+        >
+          <HugeiconsIcon icon={SparklesIcon} strokeWidth={2} className="size-3.5" />
+          Fill NMI P108 RP-15Y Example Data
+        </Button>
+      </div>
+
+      {/* Operational parameters */}
+      <div className="rounded-md border border-border bg-muted/20 p-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <Label className="font-semibold text-foreground shrink-0">Zero Tracking Device Status:</Label>
+          <select
+            value={zeroTracking}
+            onChange={(e) => setZeroTracking(e.target.value)}
+            disabled={disabled}
+            className="h-8 rounded border border-border bg-background px-2 font-mono text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+          >
+            <option value="in_operation">In Operation (Standard)</option>
+            <option value="disabled">Disabled / Out of Operation</option>
+          </select>
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          Requirement: Range (P<sub>max</sub> − P<sub>min</sub>) ≤ |MPE(L)| (§3.6.1)
         </div>
       </div>
 

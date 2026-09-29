@@ -26,11 +26,17 @@ def extract_row_array(observations: Dict[str, Any]) -> Optional[List[Any]]:
     return None
 
 
-def extract_repeatability_load_sets(observations: Dict[str, Any], context: EvaluationContext) -> List[Dict[str, Any]]:
+def extract_repeatability_load_sets(observations, context):
     """
     Parses observation payload for repeatability tests into independent load sets.
     Supports single-set and multi-set payloads, as well as single-interval and multi-interval instruments.
-    Returns a list of dicts containing set_index, test_load, readings, mpe_result, and active_e.
+    Returns a list of dicts: set_index, test_load, readings (P values), trials (raw obs), mpe_result, active_e.
+
+    Supported payload shapes:
+      0. Named sets:   { "set1": { "load": 7.5, "trials": [{"I": 7.5, "dL": 0.0025}, ...] }, "set2": {...} }
+      1. Explicit arr: { "load_sets": [...] } or { "sets": [...] } etc.
+      2. Flat grouped: { "readings": [{"load": 7.5, "I": 7.5, "dL": 0.0025}, ...] }
+      3. Single set:   { "test_load": 7.5, "readings": [...] }
     """
     if not isinstance(observations, dict):
         return []
@@ -38,16 +44,15 @@ def extract_repeatability_load_sets(observations: Dict[str, Any], context: Evalu
     from app.engine.mpe_engine import MPEEngine
     mpe_engine = MPEEngine()
 
-    def resolve_reading_val(item: Any, active_e: float) -> Optional[float]:
+    def resolve_p_val(item, active_e):
+        """Returns (P_value, I_value, dL_value) or None if item is invalid."""
         if isinstance(item, dict):
-            ind = item.get("I") if item.get("I") is not None else (
-                item.get("indication") if item.get("indication") is not None else (
-                    item.get("val") if item.get("val") is not None else (
-                        item.get("value") if item.get("value") is not None else (
-                            item.get("reading")
-                        )
-                    )
-                )
+            ind = (
+                item.get("I") if item.get("I") is not None else
+                item.get("indication") if item.get("indication") is not None else
+                item.get("val") if item.get("val") is not None else
+                item.get("value") if item.get("value") is not None else
+                item.get("reading")
             )
             if ind is not None and str(ind).strip() != "":
                 try:
@@ -55,69 +60,124 @@ def extract_repeatability_load_sets(observations: Dict[str, Any], context: Evalu
                     dL_raw = item.get("dL")
                     if dL_raw is not None and str(dL_raw).strip() != "":
                         dL_val = float(dL_raw)
-                        return I_val + (0.5 * active_e if dL_val > 0 else 0.0) - dL_val
-                    return I_val
+                        P_val = I_val + (0.5 * active_e if dL_val > 0 else 0.0) - dL_val
+                        return (P_val, I_val, dL_val)
+                    return (I_val, I_val, 0.0)
                 except (ValueError, TypeError):
                     return None
         elif item is not None and str(item).strip() != "":
             try:
-                return float(item)
+                f = float(item)
+                return (f, f, 0.0)
             except (ValueError, TypeError):
                 return None
         return None
 
-    load_groups: List[Dict[str, Any]] = []
+    load_groups = []
 
-    # 1. Check for explicit load sets array (load_sets, repeatability_sets, sets, groups, test_loads)
-    set_array_keys = ["load_sets", "repeatability_sets", "sets", "groups", "test_loads"]
-    explicit_sets = None
-    for key in set_array_keys:
-        val = observations.get(key)
-        if isinstance(val, list) and len(val) > 0:
-            explicit_sets = val
-            break
+    def _make_group(set_index, load_val, raw_items, mpe_res, active_e):
+        trials_data = []
+        p_values = []
+        for idx2, r in enumerate(raw_items):
+            result = resolve_p_val(r, active_e)
+            if result is not None:
+                P_val, I_val, dL_val = result
+                p_values.append(P_val)
+                trials_data.append({
+                    "trial_index": idx2 + 1,
+                    "I": round(I_val, 6),
+                    "dL": round(dL_val, 6),
+                    "P": round(P_val, 6),
+                })
+        if len(p_values) >= 2:
+            return {
+                "set_index": set_index,
+                "test_load": load_val,
+                "readings": p_values,
+                "trials": trials_data,
+                "mpe_result": mpe_res,
+                "active_e": active_e,
+            }
+        return None
 
-    if explicit_sets:
-        for idx, s in enumerate(explicit_sets):
-            if isinstance(s, dict):
-                load_val = float(s.get("test_load") if s.get("test_load") is not None else (
-                    s.get("load") if s.get("load") is not None else (
-                        s.get("L") if s.get("L") is not None else (context.max_capacity * 0.5)
-                    )
-                ))
-                mpe_res = mpe_engine.calculate_mpe(
-                    accuracy_class=context.accuracy_class,
-                    load=load_val,
-                    e_resolution=context.e_resolution,
-                    unit=context.unit,
-                    verification_type=context.verification_type,
-                    intervals=context.weighing_intervals
-                )
-                active_e = mpe_res.source.get("active_e", context.e_resolution) if mpe_res.source else context.e_resolution
-                raw_readings = s.get("readings") or s.get("indications") or s.get("rows") or s.get("repeatability_readings") or []
-                nums = []
-                for r in raw_readings:
-                    rv = resolve_reading_val(r, active_e)
-                    if rv is not None:
-                        nums.append(rv)
-                if nums:
-                    load_groups.append({
-                        "set_index": idx + 1,
-                        "test_load": load_val,
-                        "readings": nums,
-                        "mpe_result": mpe_res,
-                        "active_e": active_e
-                    })
+    # Path 0: Named set1/set2 structure (primary frontend format)
+    named_sets = []
+    for set_key in ["set1", "set2", "set3", "set4"]:
+        s = observations.get(set_key)
+        if isinstance(s, dict):
+            named_sets.append(s)
 
-    # 2. Check for flat list of dicts with distinct test_load / load values
+    if named_sets:
+        for idx, s in enumerate(named_sets):
+            load_raw = (
+                s.get("load") if s.get("load") is not None else
+                s.get("test_load") if s.get("test_load") is not None else
+                s.get("L") if s.get("L") is not None else
+                (context.max_capacity * 0.5 if idx == 0 else context.max_capacity)
+            )
+            load_val = float(load_raw)
+            mpe_res = mpe_engine.calculate_mpe(
+                accuracy_class=context.accuracy_class,
+                load=load_val,
+                e_resolution=context.e_resolution,
+                unit=context.unit,
+                verification_type=context.verification_type,
+                intervals=context.weighing_intervals
+            )
+            active_e = mpe_res.source.get("active_e", context.e_resolution) if mpe_res.source else context.e_resolution
+            raw_items = s.get("trials") or s.get("readings") or s.get("indications") or s.get("rows") or []
+            g = _make_group(idx + 1, load_val, raw_items, mpe_res, active_e)
+            if g:
+                load_groups.append(g)
+
+    # Path 1: Explicit load sets array
     if not load_groups:
-        readings_list = observations.get("readings") or observations.get("repeatability_readings") or observations.get("indications") or observations.get("rows") or observations.get("steps")
+        set_array_keys = ["load_sets", "repeatability_sets", "sets", "groups", "test_loads"]
+        explicit_sets = None
+        for key in set_array_keys:
+            val = observations.get(key)
+            if isinstance(val, list) and len(val) > 0:
+                explicit_sets = val
+                break
+
+        if explicit_sets:
+            for idx, s in enumerate(explicit_sets):
+                if isinstance(s, dict):
+                    load_raw = (
+                        s.get("test_load") if s.get("test_load") is not None else
+                        s.get("load") if s.get("load") is not None else
+                        s.get("L") if s.get("L") is not None else
+                        context.max_capacity * 0.5
+                    )
+                    load_val = float(load_raw)
+                    mpe_res = mpe_engine.calculate_mpe(
+                        accuracy_class=context.accuracy_class,
+                        load=load_val,
+                        e_resolution=context.e_resolution,
+                        unit=context.unit,
+                        verification_type=context.verification_type,
+                        intervals=context.weighing_intervals
+                    )
+                    active_e = mpe_res.source.get("active_e", context.e_resolution) if mpe_res.source else context.e_resolution
+                    raw_items = s.get("readings") or s.get("trials") or s.get("indications") or s.get("rows") or s.get("repeatability_readings") or []
+                    g = _make_group(idx + 1, load_val, raw_items, mpe_res, active_e)
+                    if g:
+                        load_groups.append(g)
+
+    # Path 2: Flat list of dicts grouped by load
+    if not load_groups:
+        readings_list = (
+            observations.get("readings") or observations.get("repeatability_readings") or
+            observations.get("indications") or observations.get("rows") or observations.get("steps")
+        )
         if isinstance(readings_list, list) and len(readings_list) > 0 and isinstance(readings_list[0], dict):
-            dict_groups: Dict[float, List[Any]] = {}
+            dict_groups = {}
             for item in readings_list:
                 if isinstance(item, dict):
-                    l_val = item.get("test_load") if item.get("test_load") is not None else (
-                        item.get("load") if item.get("load") is not None else item.get("L")
+                    l_val = (
+                        item.get("test_load") if item.get("test_load") is not None else
+                        item.get("load") if item.get("load") is not None else
+                        item.get("L")
                     )
                     if l_val is not None:
                         try:
@@ -137,27 +197,19 @@ def extract_repeatability_load_sets(observations: Dict[str, Any], context: Evalu
                         intervals=context.weighing_intervals
                     )
                     active_e = mpe_res.source.get("active_e", context.e_resolution) if mpe_res.source else context.e_resolution
-                    nums = []
-                    for r in items:
-                        rv = resolve_reading_val(r, active_e)
-                        if rv is not None:
-                            nums.append(rv)
-                    if nums:
-                        load_groups.append({
-                            "set_index": idx + 1,
-                            "test_load": load_val,
-                            "readings": nums,
-                            "mpe_result": mpe_res,
-                            "active_e": active_e
-                        })
+                    g = _make_group(idx + 1, load_val, items, mpe_res, active_e)
+                    if g:
+                        load_groups.append(g)
 
-    # 3. Fallback: single top-level load set
+    # Path 3: Single top-level set
     if not load_groups:
-        top_load = float(observations.get("test_load") if observations.get("test_load") is not None else (
-            observations.get("load") if observations.get("load") is not None else (
-                observations.get("L") if observations.get("L") is not None else (context.max_capacity * 0.5)
-            )
-        ))
+        top_load_raw = (
+            observations.get("test_load") if observations.get("test_load") is not None else
+            observations.get("load") if observations.get("load") is not None else
+            observations.get("L") if observations.get("L") is not None else
+            context.max_capacity * 0.5
+        )
+        top_load = float(top_load_raw)
         mpe_res = mpe_engine.calculate_mpe(
             accuracy_class=context.accuracy_class,
             load=top_load,
@@ -167,21 +219,14 @@ def extract_repeatability_load_sets(observations: Dict[str, Any], context: Evalu
             intervals=context.weighing_intervals
         )
         active_e = mpe_res.source.get("active_e", context.e_resolution) if mpe_res.source else context.e_resolution
-        raw_readings = observations.get("readings") or observations.get("repeatability_readings") or observations.get("indications") or []
-        nums = []
+        raw_readings = (
+            observations.get("readings") or observations.get("repeatability_readings") or
+            observations.get("indications") or []
+        )
         if isinstance(raw_readings, list):
-            for r in raw_readings:
-                rv = resolve_reading_val(r, active_e)
-                if rv is not None:
-                    nums.append(rv)
-        if nums:
-            load_groups.append({
-                "set_index": 1,
-                "test_load": top_load,
-                "readings": nums,
-                "mpe_result": mpe_res,
-                "active_e": active_e
-            })
+            g = _make_group(1, top_load, raw_readings, mpe_res, active_e)
+            if g:
+                load_groups.append(g)
 
     return load_groups
 

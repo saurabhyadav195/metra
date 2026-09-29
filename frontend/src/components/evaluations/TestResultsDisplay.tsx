@@ -94,6 +94,94 @@ function WeighingResults({ data }: { data: WeighingCalculations }) {
 // ─── Repeatability Results ────────────────────────────────────────────────────
 
 function RepeatabilityResults({ data }: { data: RepeatabilityCalculations }) {
+  const sets = data.load_sets || (data.rows && Array.isArray(data.rows) && data.rows[0]?.range !== undefined ? data.rows : null);
+
+  if (sets && sets.length > 0) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <p className="text-xs font-semibold text-foreground">OIML R 76-1 §A.4.10 — Repeatability Results</p>
+            <EvaluationStatusBadge status={data.status} />
+          </div>
+          {data.zero_tracking && (
+            <span className="text-[11px] font-mono bg-muted px-2 py-0.5 rounded border border-border text-muted-foreground">
+              Zero Tracking: {String(data.zero_tracking) === "in_operation" || data.zero_tracking === true ? "In Operation" : "Disabled"}
+            </span>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          {sets.map((s: any, idx: number) => (
+            <div key={idx} className="rounded-md border border-border p-3 bg-muted/20 space-y-2">
+              <div className="flex items-center justify-between border-b border-border pb-1.5 text-xs">
+                <span className="font-bold text-foreground font-mono">
+                  Set {s.set_index || idx + 1}: Load L = {fmt(s.test_load, 3)} kg (n = {s.n_readings || s.readings?.length})
+                </span>
+                <EvaluationStatusBadge status={s.result || "PASS"} />
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                <div className="bg-background/60 p-1.5 rounded border border-border/50">
+                  <span className="text-[10px] text-muted-foreground block">Max P (or I)</span>
+                  <span className="font-semibold text-foreground">{fmt(s.I_max, 5)} kg</span>
+                </div>
+                <div className="bg-background/60 p-1.5 rounded border border-border/50">
+                  <span className="text-[10px] text-muted-foreground block">Min P (or I)</span>
+                  <span className="font-semibold text-foreground">{fmt(s.I_min, 5)} kg</span>
+                </div>
+                <div className="bg-background/60 p-1.5 rounded border border-border/50">
+                  <span className="text-[10px] text-muted-foreground block">Range (Pmax − Pmin)</span>
+                  <span className={`font-bold ${s.result === "FAIL" ? "text-red-600" : "text-primary"}`}>
+                    {fmt(s.range, 5)} kg
+                  </span>
+                </div>
+                <div className="bg-background/60 p-1.5 rounded border border-border/50">
+                  <span className="text-[10px] text-muted-foreground block">MPE Limit</span>
+                  <span className="font-semibold text-foreground">±{fmt(s.mpe_value, 5)} kg</span>
+                </div>
+              </div>
+              {s.trials && s.trials.length > 0 && (
+                <details className="text-[11px] font-mono mt-1">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+                    View Observation Trials ({s.trials.length} readings)
+                  </summary>
+                  <table className="w-full text-left border-collapse mt-1.5 border border-border rounded">
+                    <thead>
+                      <tr className="bg-muted/50 text-muted-foreground border-b border-border">
+                        <th className="p-1 text-center">Trial</th>
+                        <th className="p-1">Indication I</th>
+                        <th className="p-1">Changeover ΔL</th>
+                        <th className="p-1">Calculated P</th>
+                        <th className="p-1">Error E</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/50">
+                      {s.trials.map((t: any, tIdx: number) => {
+                        const P = t.P ?? t.I;
+                        const E = P - s.test_load;
+                        return (
+                          <tr key={tIdx}>
+                            <td className="p-1 text-center text-muted-foreground">{t.trial_index || tIdx + 1}</td>
+                            <td className="p-1">{fmt(t.I, 4)}</td>
+                            <td className="p-1 text-amber-600 dark:text-amber-400">{t.dL !== undefined ? fmt(t.dL, 4) : "—"}</td>
+                            <td className="p-1 font-semibold">{fmt(P, 5)}</td>
+                            <td className="p-1">{E >= 0 ? `+${fmt(E, 5)}` : fmt(E, 5)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </details>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <RuleReferencesSection refs={data.rule_references} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-3">
@@ -104,7 +192,7 @@ function RepeatabilityResults({ data }: { data: RepeatabilityCalculations }) {
         <div className="text-muted-foreground">Test Load</div>
         <div className="font-mono">{fmt(data.test_load, 3)}</div>
         <div className="text-muted-foreground">Readings (n={data.n_readings})</div>
-        <div className="font-mono">{data.readings.map(r => fmt(r, 4)).join(", ")}</div>
+        <div className="font-mono">{data.readings?.map(r => fmt(r, 4)).join(", ")}</div>
         <div className="text-muted-foreground">Max</div>
         <div className="font-mono">{fmt(data.I_max, 5)}</div>
         <div className="text-muted-foreground">Min</div>
