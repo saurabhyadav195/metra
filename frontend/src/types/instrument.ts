@@ -23,6 +23,7 @@ export type InstrumentType =
   | "counter_scale"
   | "floor_scale"
   | "hopper_scale"
+  | "price_computing_scale"
   | "other";
 
 export const INSTRUMENT_TYPE_LABELS: Record<InstrumentType, string> = {
@@ -32,6 +33,7 @@ export const INSTRUMENT_TYPE_LABELS: Record<InstrumentType, string> = {
   counter_scale: "Counter Scale",
   floor_scale: "Floor Scale",
   hopper_scale: "Hopper Scale",
+  price_computing_scale: "Price Computing Scale",
   other: "Other",
 };
 

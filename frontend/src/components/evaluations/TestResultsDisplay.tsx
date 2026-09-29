@@ -6,6 +6,8 @@
 import type {
   WeighingCalculations,
   RepeatabilityCalculations,
+  RepeatabilityLoadSet,
+  RepeatabilityTrial,
   EccentricityCalculations,
   DiscriminationCalculations,
   RuleReference,
@@ -112,13 +114,13 @@ function RepeatabilityResults({ data }: { data: RepeatabilityCalculations }) {
         </div>
 
         <div className="space-y-3">
-          {sets.map((s: any, idx: number) => (
+          {sets.map((s: RepeatabilityLoadSet, idx: number) => (
             <div key={idx} className="rounded-md border border-border p-3 bg-muted/20 space-y-2">
               <div className="flex items-center justify-between border-b border-border pb-1.5 text-xs">
                 <span className="font-bold text-foreground font-mono">
                   Set {s.set_index || idx + 1}: Load L = {fmt(s.test_load, 3)} kg (n = {s.n_readings || s.readings?.length})
                 </span>
-                <EvaluationStatusBadge status={s.result || "PASS"} />
+                <EvaluationStatusBadge status={s.result || s.status || "PASS"} />
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
                 <div className="bg-background/60 p-1.5 rounded border border-border/50">
@@ -156,7 +158,7 @@ function RepeatabilityResults({ data }: { data: RepeatabilityCalculations }) {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/50">
-                      {s.trials.map((t: any, tIdx: number) => {
+                      {s.trials.map((t: RepeatabilityTrial, tIdx: number) => {
                         const P = t.P ?? t.I;
                         const E = P - s.test_load;
                         return (
@@ -177,7 +179,7 @@ function RepeatabilityResults({ data }: { data: RepeatabilityCalculations }) {
           ))}
         </div>
 
-        <RuleReferencesSection refs={data.rule_references} />
+        <RuleReferencesSection refs={data.rule_references || []} />
       </div>
     );
   }

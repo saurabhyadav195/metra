@@ -204,9 +204,34 @@ export interface WeighingCalculations {
   message?: string;
 }
 
+export interface RepeatabilityTrial {
+  trial_index: number;
+  I: number;
+  dL?: number;
+  P?: number;
+}
+
+export interface RepeatabilityLoadSet {
+  set_index: number;
+  test_load: number;
+  active_e?: number;
+  readings?: number[];
+  trials?: RepeatabilityTrial[];
+  I_max: number;
+  I_min: number;
+  range: number;
+  mpe_value: number;
+  mpe_e?: number;
+  n_readings?: number;
+  result?: string;
+  status?: string;
+  message?: string;
+}
+
 export interface RepeatabilityCalculations {
   status: string;
   test_load?: number;
+  active_e?: number;
   readings?: number[];
   I_max?: number;
   I_min?: number;
@@ -214,6 +239,9 @@ export interface RepeatabilityCalculations {
   mpe_value?: number;
   mpe_e?: number;
   n_readings?: number;
+  zero_tracking?: string | boolean;
+  load_sets?: RepeatabilityLoadSet[];
+  rows?: RepeatabilityLoadSet[];
   rule_references?: RuleReference[];
   message?: string;
 }
